@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org"
+>
+<head th:replace="~{fragments/header :: header}">
+    <link href="../../static/css/emoji/nature.css" th:href="@{/css/emoji/nature.css}" rel="stylesheet">
+    <link href="../../static/css/emoji/object.css" th:href="@{/css/emoji/object.css}" rel="stylesheet">
+    <link href="../../static/css/emoji/people.css" th:href="@{/css/emoji/people.css}" rel="stylesheet">
+    <link href="../../static/css/emoji/place.css" th:href="@{/css/emoji/place.css}" rel="stylesheet">
+    <link href="../../static/css/emoji/Sysmbols.css" th:href="@{/css/emoji/Sysmbols.css}" rel="stylesheet">
+    <link href="../../static/css/emoji/twemoji.css" th:href="@{/css/emoji/twemoji.css}" rel="stylesheet">
+</head>
+<body>
+<!--<style type="text/css">
+
+    @import "../../static/css/emoji/nature.css";
+    @import "../../static/css/emoji/object.css";
+    @import "../../static/css/emoji/people.css";
+    @import "../../static/css/emoji/place.css";
+    @import "../resources/static/css/emoji/Sysmbols.css";
+    @import "../resources/static/css/emoji/twemoji.css";
+
+</style>-->
+<!-- Page Content -->
+<div class="container blog-content-container">
+
+    <div class="row">
+
+        <!-- Blog Entries Column -->
+        <div class="col-md-8">
+
+            <!-- Blog Post -->
+            <div class="card mb-4">
+                <div class="card-block" th:object="${blogModel.blog}">
+                    <input type="hidden" id="id" name="id" th:value="*{blogId}">
+                    <input type="hidden" id="userId" name="userId" th:value="*{userId}">
+                    <input type="text" class="form-control" placeholder="请填写博客标题" id="title" name="title"
+                           th:value="*{title}" maxlength="50" th:required>
+                    <textarea class="blog-textarea" placeholder="请填写博客摘要" id="summary" name="summary"
+                              th:text="*{summary}" maxlength="300"></textarea>
+                    <hr>
+                    <!--博客正文：使用的是markdown的插件-->
+                    <textarea id="md" data-provide="markdown" data-hidden-buttons="cmdImage" name="content"
+                              th:text="*{content}"></textarea>
+                    <hr>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- 右侧栏目 -->
+        <div class="col-md-4">
+
+            <!-- 文章目录 -->
+            <div class="card ">
+                <!-- 图片上传 -->
+                <h5 class="card-header"><i class="fa fa-file-image-o" aria-hidden="true"></i> 图片上传</h5>
+                <div class="card-block">
+                    <div class="row mt-1">
+                        <div class="col-lg-12">
+                            <form enctype="multipart/form-data" id="uploadformid">
+                                <input type="file" name="file" accept="image/png,image/gif,image/jpeg" id="file">
+                                <button class="btn btn-primary float-right" type="button" id="uploadImage">插入</button>
+                            </form>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="card ">
+                <h5 class="card-header"><i class="fa fa-cog" aria-hidden="true"></i> 博客设置</h5>
+                <div class="card-block">
+                    <div class="row mt-1">
+                        <div class="col-lg-12">
+                            标签：
+                            <input type="text" class="form-control form-control-tag" th:value="${blogModel.blog.tags}">
+                        </div>
+                    </div>
+                    <div id="catalogMain">
+                        <div class="card my-4" id="catalogRepleace">
+                            <h5 class="card-header">
+                                <i class="fa fa-bars" aria-hidden="true"></i>
+                                分类
+                                <!--只允许本人增加分类-->
+                                <a href="javascript:void(0)" th:if="${isCatalogsOwner}" class="blog-add-catalog blog-right"
+                                   data-toggle="modal" data-target="#flipFlop" role="button">
+                                    <i class="fa fa-plus" aria-hidden="true"></i>
+                                </a>
+                            </h5>
+
+                            <ul class="list-group" th:each="catalog : ${catalogs}" th:object="${catalog}">
+                                <div class="blog-list-group-item">
+                                    <a href="javascript:void(0)" th:attr="catalogId=*{id}" class="blog-query-by-catalog">
+                                        [[*{name}]]
+                                    </a>
+                                    <span class="blog-right">
+                                <!--只允许本人编辑分类-->
+                                <a href="javascript:void(0)" th:if="${isCatalogsOwner}" class="blog-edit-catalog"
+                                   data-toggle="modal"
+                                   data-target="#flipFlop" role="button" th:attr="catalogId=*{id}">
+                                    <i class="fa fa-pencil-square-o" aria-hidden="true"></i>
+                                </a>
+                                        <!--只允许本人删除分类-->
+                                <a href="javascript:void(0)" th:if="${isCatalogsOwner}" class="blog-delete-catalog"
+                                   th:attr="catalogId=*{id}">
+                                    <i class="fa fa-times" aria-hidden="true"></i>
+                                </a>
+	            		    </span>
+                                </div>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="row mt-1">
+                        <div class="col-lg-12">
+                            分类：
+                            <select id="catalogSelect" class="form-control form-control-chosen" data-placeholder="请选择">
+                                <option th:each="catalog : ${blogModel.catalogs}"
+                                        th:object="${catalog}"
+                                        th:selected="${blogModel.blog.catalog != null && catalog.id eq blogModel.blog.catalog.id}"
+                                        th:value="*{id}"
+                                        th:text="*{name}">
+                                    Java
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-1">
+                        <div class="col-lg-12">
+                            <button class="btn btn-primary float-right" id="submitBlog"
+                                    th:attr="usreName=${#authentication.name}">发布
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+    <!-- /.row -->
+
+    <!-- The modal -->
+    <div class="modal fade" id="flipFlop" tabindex="-1" role="dialog"
+         aria-labelledby="modalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="modalLabel">新增/编辑</h4>
+                    <button type="button" class="close" data-dismiss="modal"
+                            aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+
+                </div>
+                <div class="modal-body" id="catalogFormContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-dismiss="modal" id="submitEditCatalog">提交</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /.container -->
+
+
+<div th:replace="~{fragments/footer :: footer}">...</div>
+<script th:inline="javascript">
+    var username = [[${#authentication.name}]];
+    var catalogId = [[${catalogId}]];
+</script>
+<script src="../../static/js/userspace/blogedit.js" th:src="@{/js/userspace/blogedit.js}"></script>
+<script src="../../static/js/userspace/u.js" th:src="@{/js/userspace/u.js}"></script>
+
+</body>
+</html>

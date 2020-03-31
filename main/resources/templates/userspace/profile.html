@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org"
+>
+<head th:replace="~{fragments/header :: header}">
+</head>
+<body>
+<!-- Page Content -->
+<div class="container blog-content-container">
+
+    <div class="row">
+
+        <!-- 左侧栏目 -->
+        <div class="col-md-4 col-xl-3">
+
+            <div class="row">
+                <div class="col-md-12">
+                    <span>
+                        <!--
+                        具备点击事件：当点击用户头像，弹出用户头像的管理界面
+                        -->
+                        <a class="blog-edit-avatar" data-toggle="modal"
+                           data-target="#flipFlop" role="button"
+                           data-th-attr="userName=${userModel.user.username}">
+                            <!--
+                            用户头像核心：
+                            获取到用户头像的url，检测该url是否不为null（用户是否设置了头像）
+                                如果为null则从默认页面中获取默认的头像
+                                否则根据用户avatar url将用户设置的头像取出做展示
+                            -->
+                            <img th:src="${userModel.user.avatar} == null ? '/images/avatar-default.jpg' : ${userModel.user.avatar}"
+                                 class="blog-avatar blog-avatar-230">
+                        </a>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!--
+            右侧栏目
+            个人设置相关内容：form表单
+        -->
+        <div class="col-md-8 col-xl-9">
+            <!-- 个人设置 -->
+            <div class="card ">
+                <h5 class="card-header"><i class="fa fa-cog" aria-hidden="true"></i> 个人设置</h5>
+                <span th:if="${userModel.msg} != null" style="color: red; font-weight: bold" th:text="${userModel.msg}"></span>
+                <div class="card-block">
+                    <!--
+                    {pathVariable}(pathVariable=${node.getPerson().getName()})
+                        th:action="@{/u/{pathVariable}/profile(pathVariable=${userModel.user.username})}"
+                    th:action="@{'/u/'+${pathVariable}+'/profile'}"
+                    -->
+                    <form th:action="@{/u/{pathVariable}/profile(pathVariable=${userModel.user.username})}" method="post" th:object="${userModel.user}" id="userForm">
+                        <input type="hidden" name="id" id="userId" th:value="*{id}">
+
+                        <div class="form-group ">
+                            <label for="username" class="col-form-label">账号</label>
+                            <!--账号不允许修改：只读-->
+                            <input type="text" class="form-control" id="username" name="username" required th:value="*{username}"
+                                   readonly="readonly">
+                        </div>
+                        <div class="form-group">
+                            <label for="email" class="col-form-label">邮箱</label>
+                            <input type="email" class="form-control" id="email" name="email" th:value="*{email}" required
+                                   maxlength="50" placeholder="请输入邮箱">
+                        </div>
+                        <div class="form-group">
+                            <label for="name" class="col-form-label">姓名</label>
+                            <input type="text" class="form-control" id="name" name="name" required th:value="*{name}"
+                                   maxlength="20" placeholder="请输入姓名，至少2个字符，至多20个">
+                        </div>
+                        <div class="form-group">
+                            <label for="password" class="col-form-label">密码</label>
+                            <input type="password" class="form-control" id="password" name="password" required
+                                   th:value="*{password}" maxlength="30" placeholder="请输入密码，至少3个字符，至多30个">
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- /.row -->
+</div>
+<!-- /.container -->
+
+<!-- The modal -->
+<div class="modal fade" id="flipFlop" tabindex="-1" role="dialog"
+     aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="modalLabel">编辑头像</h4>
+                <button type="button" class="close" data-dismiss="modal"
+                        aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+
+            </div>
+            <div class="modal-body" id="avatarFormContainer"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-dismiss="modal" id="submitEditAvatar">提交</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{fragments/footer :: footer}">...</div>
+
+<!-- JavaScript -->
+<script src="../../static/js/userspace/main.js" th:src="@{/js/userspace/main.js}"></script>
+
+</body>
+</html>

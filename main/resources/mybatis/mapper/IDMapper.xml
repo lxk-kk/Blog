@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--通过命名空间映射到接口上-->
+<mapper namespace="com.study.blog.repository.IDRepository">
+    <select id="getUserId" resultType="com.study.blog.entity.ID">
+        SELECT c.user_id commentUserId,b.user_id blogUserId
+        from comment c,blog b
+        WHERE c.id=#{commentId} and b.blog_id=#{blogId};
+    </select>
+</mapper>

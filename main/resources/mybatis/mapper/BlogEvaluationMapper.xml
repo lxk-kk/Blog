@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.study.blog.repository.BlogEvaluationRepository">
+    <insert id="insertVote" keyProperty="id" useGeneratedKeys="true">
+        INSERT INTO
+        vote(user_id,blog_id)
+        VALUES (#{vote.userId},#{vote.blogId});
+    </insert>
+    <insert id="insertComment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO
+        comment(user_id,blog_id,content)
+        VALUES (#{comment.userId},#{comment.blogId},#{comment.content});
+    </insert>
+    <delete id="deleteVoteByVoteId">
+        DELETE FROM
+        vote
+        WHERE id=#{voteId};
+    </delete>
+    <delete id="deleteCommentByCommentId">
+        DELETE FROM
+        comment
+        WHERE id=#{commentId};
+    </delete>
+
+    <select id="findByBlogId" resultMap="selectBlogEvaluation">
+        SELECT
+        b.read_count,b.comment_count,b.like_count,b.blog_id,
+        c.id,c.user_id,c.blog_id,c.content,
+        v.id,v.user_id,v.blog_id
+        FROM blog b
+        LEFT JOIN comment c ON b.blog_id=c.blog_id
+        LEFT JOIN vote v ON b.blog_id=v.blog_id
+        WHERE b.blog_id=#{blogId};
+    </select>
+
+    <!--
+    批量更新！
+    1、批量 实体 的更新：需要在 数据源的url上加上 allowMultiQueries=true，
+        使用druid时还要配置 WallFilter 或者直接将 yml 配置文件中的 druid配置的 filters 属性中的wall去掉
+    2、多个表的更新：使用级联
+    3、<foreach>内部还可以套用<foreach>
+    4、<foreach> 上的 collection 参数
+        （1）是 repository 的接口参数，如果不适用 @Param 进行标识，则存在默认值
+        （2）如果 <foreach> 处于嵌套在内层的 <foreach> 则，该参数可以是 【 外层item.实体的属性 】
+    5、注意：只有更新最有一个属性的时候才不用加逗号，<foreach>内部的更新都要加 逗号 进行分隔，除非是一个update的最后一条属性更新
+        如： c.content=#{comment.content,jdbcType=VARCHAR} 最后没有加上逗号
+        报错：expect IDENTIFIER, actual IDENTIFIER ... token IDENTIFIER v v.id=?  v.user_id=?
+     -->
+    <!--
+        <update id="saveBlogEvaluationByBlogId" parameterType="com.study.blog.dto.BlogEvaluationCacheDTO">
+            UPDATE blog b
+            ,comment c
+            ,vote v
+            <trim prefix="set" suffixOverrides=",">
+                <trim prefix="b.read_count = case" suffix="end ,">
+                    <foreach collection="evaluationList" item="blog">
+                        <if test="blog.readingCount != null">
+                            when b.blog_id=#{blog.blogId} then #{blog.readingCount}
+                        </if>
+                    </foreach>
+                    else b.read_count
+                </trim>
+                <trim prefix="b.comment_count = case" suffix="end ,">
+                    <foreach collection="evaluationList" item="blog">
+                        when b.blog_id=#{blog.blogId} then #{blog.commentCount}
+                    </foreach>
+                    else b.comment_count
+                </trim>
+                <trim prefix="b.like_count = case" suffix="end ,">
+                    <foreach collection="evaluationList" item="blog">
+                        when b.blog_id=#{blog.blogId} then #{blog.voteCount}
+                    </foreach>
+                    else b.like_count
+                </trim>
+                <foreach collection="evaluationList" item="blog">
+                    <if test="blog.comments.size()>0">
+                        <trim prefix="c.user_id = case" suffix="end , ">
+                            <foreach collection="blog.comments" item="comment">
+                                <if test="comment.userId != null">
+                                    when c.id=#{comment.id} and c.blog_id=#{blog.blogId} then #{comment.userId}
+                                </if>
+                            </foreach>
+                            else c.user_id
+                        </trim>
+                        <trim prefix="c.content= case" suffix="end , ">
+                            <foreach collection="blog.comments" item="comment">
+                                when c.id=#{comment.id} and c.blog_id=#{blog.blogId} then #{comment.content}
+                            </foreach>
+                            else c.content
+                        </trim>
+                    </if>
+                    <if test="blog.votes.size()>0">
+                        <trim prefix="v.user_id = case" suffix="end ,">
+                            <foreach collection="blog.votes" item="vote">
+                                <if test="vote.userId != null">
+                                    when v.id=#{vote.id} and v.blog_id=#{blog.blogId} then #{vote.userId}
+                                </if>
+                            </foreach>
+                            else v.user_id
+                        </trim>
+                    </if>
+                </foreach>
+            </trim>
+        </update>
+        -->
+    <update id="saveBlogEvaluationByBlogId" parameterType="com.study.blog.dto.BlogEvaluationCacheDTO">
+        <foreach collection="evaluationList" item="blog" separator="" close="" open="">
+            UPDATE
+            blog
+            SET
+            read_count=#{blog.readingCount},
+            comment_count=#{blog.commentCount},
+            like_count=#{blog.voteCount}
+            where blog_id=#{blog.blogId};
+            <if test="blog.comments.size()>0">
+                update comment
+                <trim prefix="set" suffixOverrides=",">
+                    <trim prefix="user_id =case" suffix="end ,">
+                        <foreach collection="blog.comments" item="comment">
+                            <if test="comment.userId != null">
+                                when id=#{comment.id} then #{comment.userId}
+                            </if>
+                        </foreach>
+                        else user_id
+                    </trim>
+                    <trim prefix="content = case" suffix="end,">
+                        <foreach collection="blog.comments" item="comment">
+                            when id=#{comment.id} then #{comment.content}
+                        </foreach>
+                        else content
+                    </trim>
+                </trim>
+                where blog_id = #{blog.blogId};
+            </if>
+            <if test="blog.votes.size()>0">
+                update vote
+                <trim prefix="set" suffixOverrides=",">
+                    <trim prefix="user_id = case" suffix="end ,">
+                        <foreach collection="blog.votes" item="vote">
+                            <if test="vote.userId != null">
+                                when id=#{vote.id} then #{vote.userId}
+                            </if>
+                        </foreach>
+                        else user_id
+                    </trim>
+                </trim>
+                where blog_id = #{blog.blogId};
+            </if>
+        </foreach>
+    </update>
+    <!--更新 blog evaluation ：read_count、comment_count、vote_count -->
+    <update id="saveBlogEvaluation" parameterType="java.util.Map">
+        UPDATE blog
+        <trim prefix="set" suffixOverrides=",">
+            <if test="readCountMap.size()>0">
+                <trim prefix="read_count =case" suffix="end,">
+                    <foreach collection="readCountMap" index="blogId" item="readCount">
+                        <if test="readCount != null">
+                            WHEN blog_id=#{blogId} then #{readCount}
+                        </if>
+                    </foreach>
+                    else read_count
+                </trim>
+            </if>
+            <if test="commentMap.size()>0">
+                <trim prefix="comment_count =case" suffix="end,">
+                    <foreach collection="commentMap" index="blogId" item="commentCount">
+                        <if test="commentCount != null">
+                            WHEN blog_id=#{blogId} then #{commentCount}
+                        </if>
+                    </foreach>
+                    else comment_count
+                </trim>
+            </if>
+            <if test="voteMap.size()>0">
+                <trim prefix="like_count =case" suffix="end;">
+                    <foreach collection="voteMap" index="blogId" item="voteCount">
+                        <if test="voteCount != null">
+                            WHEN blog_id=#{blogId} then #{voteCount}
+                        </if>
+                    </foreach>
+                    else like_count
+                </trim>
+            </if>
+        </trim>
+    </update>
+    <!--更新 comment list -->
+    <update id="saveCommentList">
+        update comment
+        <trim prefix="set" suffixOverrides=",">
+            <trim prefix="user_id =case" suffix="end ,">
+                <foreach collection="commentList" item="comment">
+                    <if test="comment.userId != null">
+                        when id=#{comment.id} then #{comment.userId}
+                    </if>
+                </foreach>
+            </trim>
+            <trim prefix="content = case" suffix="end,">
+                <foreach collection="commentList" item="comment">
+                    when id=#{comment.id} then #{comment.content}
+                </foreach>
+            </trim>
+        </trim>
+    </update>
+    <!--更新 vote list -->
+    <update id="saveVoteList">
+        update vote
+        <trim prefix="set" suffixOverrides=",">
+            <trim prefix="user_id = case" suffix="end ,">
+                <foreach collection="voteList" item="vote">
+                    <if test="vote.userId != null">
+                        when id=#{vote.id} then #{vote.userId}
+                    </if>
+                </foreach>
+            </trim>
+        </trim>
+    </update>
+    <!--注意 ： collection 和 association 中的 column 就写数据中字段的名称，不需要加表的别名！-->
+    <resultMap id="selectBlogEvaluation" type="com.study.blog.dto.BlogEvaluationCacheDTO">
+        <result property="readingCount" column="read_count"/>
+        <result property="commentCount" column="comment_count"/>
+        <result property="voteCount" column="like_count"/>
+        <collection property="comments" ofType="com.study.blog.entity.Comment">
+            <id column="id" property="id"/>
+            <result column="user_id" property="userId"/>
+            <result column="blog_id" property="blogId"/>
+            <result column="content" property="content"/>
+        </collection>
+        <collection property="votes" ofType="com.study.blog.entity.Vote">
+            <id column="id" property="id"/>
+            <result column="user_id" property="userId"/>
+            <result column="blog_id" property="blogId"/>
+        </collection>
+    </resultMap>
+</mapper>

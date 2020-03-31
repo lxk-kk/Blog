@@ -1,0 +1,78 @@
+spring:
+  thymeleaf:
+    #设置thymeleaf的编码格式
+    encoding: UTF-8
+    #设置资源文件热部署：不需要缓存，当修改前端文件后，前端文件直接重新加载好
+    cache: false
+    #使用HTML5标准
+    mode: HTML5
+  data:
+    # ES 搜索引擎
+    elasticsearch:
+      cluster-nodes: 127.0.0.1:9300
+      properties:
+        transport:
+          tcp:
+            connect_timeout: 120s
+    mongodb:
+      # 连接服务器上的 mongodb 服务器通过nginx将端口封闭(并没有实现)
+      uri: mongodb://47.103.77.143:27017/blog
+
+  datasource:
+    username: root
+    password: root
+    # allowMultiQueries=true : 表示允许批量更新 ！
+    url: jdbc:mysql://localhost:3306/blog?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT&allowMultiQueries=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 上述为jdbc连接数据库：Spring Boot会默认使用tomcat提供的数据连接池。
+
+    # 这里使用spring.datasource.type可以指定自定义的数据库连接池：使用DruidDataSource
+    type: com.alibaba.druid.pool.DruidDataSource
+    initialSize: 5 #连接池启动时，初始化的连接数量
+    minIdle: 5 #在不创建新的连接下，池中保持空闲的最小连接数
+    maxActive: 1000 #同一时间可以从池中分配的最多连接数量，0表示无限制
+    maxWait: 60000 #设置最大等待时间：ms
+    timeBetweenEvictionRunsMills: 60000
+    minEvictableIdleTimeMills: 300000
+    validationQuery: SELECT 1 FROM DUAL
+    testWhileIdle: true
+    testOnBorrow: false
+    testOnReturn: false
+
+    #是否对预处理语句prepared statement进行池管理
+    poolPreparedStatement: true
+    # 配置监控统计拦截的filters，去掉后监控界面sql无法统计，wall用于防火墙
+    # 如果想要批量更新数据库数据：
+    #   1、去掉防火墙：filters stat,slf4j
+    #   2、在防火墙中配置允许批量更新
+    # filters: stat,slf4j,wall
+    filters: stat,slf4j
+    maxPoolPreparedStatementPerConnectionSize: 20
+    useGlobalDataSourceStat: true
+    connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=500
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+  redis:
+    port: 63790
+    host: 47.103.77.143
+    timeout: 120s
+    password: qwertyuiop09901221-==-
+mybatis:
+  config-location: classpath:mybatis/mybatis-config.xml
+  #配置了mapper-locations，则不用再mybatis-config配置文件配置相应的mapper标签
+  mapper-locations: classpath:mybatis/mapper/*.xml
+
+
+# 文件服务器的接口地址：需要在8081端口上启动一个文件服务器：该服务器使用讲师写的mongodb-file-server组件
+# 该地址需要返回给前端，在需要地方 通过@Value注解就可以取得该文件服务器的地址：@Value("${file.server.url}")
+#file:
+#  server:
+#    ip: 47.103.77.143
+#    port: 27017
+pagehelper:
+  reasonable: true
+  params: pageNum=pageIndex;pageSize=pageSize
+  support-methods-arguments: true
+

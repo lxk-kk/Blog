@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--通过命名空间映射到接口上-->
+<mapper namespace="com.study.blog.repository.UserMapper">
+    <!--
+    useGeneratedKeys="true" 设置是否使用JDBC的getGenereatedKeys方法获取主键并赋值到keyProperty设置的主键字段中
+    keyProperty="id"  指定JavaBean的主键字段
+    -->
+    <insert id="createUser" parameterType="com.study.blog.entity.User" useGeneratedKeys="true" keyProperty="id">
+        insert into user(name,email,username,password) VALUES (#{name},#{email},#{username},#{password});
+    </insert>
+
+    <update id="updateUser" parameterType="com.study.blog.entity.User">
+        UPDATE user set name=#{name},email=#{email},username=#{username},password=#{password} where id=#{id};
+    </update>
+
+    <update id="saveUserAvatar">
+        update USER  SET avatar=#{avatarUrl} where username=#{username}
+    </update>
+
+    <delete id="deleteUser">
+        delete FROM user where id=#{id}
+    </delete>
+    <resultMap id="selectUser" type="com.study.blog.entity.User">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="email" property="email"/>
+        <result column="username" property="username"/>
+        <result column="avatar" property="avatar"/>
+        <collection property="authorities" ofType="com.study.blog.entity.Authority">
+            <id column="authority_id" property="authorityId"/>
+            <result column="authority_name" property="authorityName"/>
+        </collection>
+    </resultMap>
+    <resultMap id="selectDetailUser" type="com.study.blog.entity.User">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="email" property="email"/>
+        <result column="username" property="username"/>
+        <result column="password" property="password"/>
+        <result column="avatar" property="avatar"/>
+        <collection property="authorities" ofType="com.study.blog.entity.Authority">
+            <id column="authority_id" property="authorityId"/>
+            <result column="authority_name" property="authorityName"/>
+        </collection>
+    </resultMap>
+    <sql id="selectUserWithPassword">
+         select
+        u.id,u.name,u.email,u.username,u.password,u.avatar,
+        a.authority_id,a.authority_name
+        from user u
+        LEFT OUTER JOIN user_authority ua ON ua.user_id=u.id
+        LEFT OUTER JOIN authority a ON a.authority_id=ua.authority_id
+    </sql>
+    <sql id="selectUserWithoutPassword">
+        select
+        u.id,u.name,u.email,u.username,u.avatar,
+        a.authority_id,a.authority_name
+        from user u
+        LEFT OUTER JOIN user_authority ua ON ua.user_id=u.id
+        LEFT OUTER JOIN authority a ON a.authority_id=ua.authority_id
+    </sql>
+    <select id="searchById" resultMap="selectDetailUser">
+        <include refid="selectUserWithPassword"/>
+        where u.id=#{id};
+    </select>
+    <select id="findOneByUsername" resultMap="selectDetailUser">
+        <include refid="selectUserWithPassword"/>
+        where u.username=#{username};
+    </select>
+    <select id="listUser" resultMap="selectUser">
+        <include refid="selectUserWithoutPassword"/>
+    </select>
+
+    <!--使用了分页组件-->
+    <select id="findByName" resultType="com.study.blog.entity.User">
+        select id,username,email,avatar
+        from user
+        inner JOIN (select id from user where name LIKE #{name}) as a
+        using(id)
+    </select>
+
+    <!-- 未使用分页组件 PageHelper
+    <select id="findByName" resultType="com.study.blog.entity.User">
+        select id,username,email,avatar
+        from user
+        inner JOIN (select id from user where name LIKE #{name} limit #{pageIndex},#{pageSize})
+        using(id);
+    </select>
+    -->
+
+
+    <select id="findUsersByUsernames" resultMap="selectUser">
+        <include refid="selectUserWithoutPassword"/>
+        WHERE u.username IN
+        <foreach collection="list" item="user" separator="," open="(" close=")">
+            #{user}
+        </foreach>
+    </select>
+</mapper>

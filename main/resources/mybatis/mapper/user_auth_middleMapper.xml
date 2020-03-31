@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--通过命名空间映射到接口上-->
+<mapper namespace="com.study.blog.repository.UserAuthMiddleMapper">
+
+    <insert id="saveUserAuth">
+        insert into user_authority(user_id,authority_id) VALUES
+        <foreach collection="authIds" item="authId" separator=",">
+            (#{userId},#{authId})
+        </foreach>
+    </insert>
+</mapper>

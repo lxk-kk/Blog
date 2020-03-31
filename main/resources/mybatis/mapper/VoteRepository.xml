@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.study.blog.repository.VoteRepository">
+    <insert id="createVote" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO vote(blog_id,user_id) VALUES (#{blogId},#{userId});
+    </insert>
+    <update id="incrementVote">
+        UPDATE blog SET like_count=like_count + 1 WHERE blog_id=#{blogId};
+    </update>
+    <update id="decrementVote">
+        UPDATE blog SET like_count=like_count - 1 WHERE blog_id in (SELECT blog_id from vote where id=#{voteId});
+    </update>
+    <delete id="removeVote">
+        DELETE FROM vote WHERE id=#{id};
+    </delete>
+    <select id="isVoted" resultType="java.lang.Integer">
+        SELECT SUM(id) from vote WHERE blog_id=#{blogId} and user_id=#{userId};
+    </select>
+    <select id="getVoteUser" resultType="java.lang.Integer">
+        SELECT user_id FROM vote WHERE id=#{voteId};
+    </select>
+    <select id="listVoteByBlogId" resultType="com.study.blog.entity.Vote">
+        SELECT id,user_id,blog_id FROM blog WHERE blog_id=#{blogId};
+    </select>
+</mapper>

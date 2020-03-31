@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--通过命名空间映射到接口上-->
+<mapper namespace="com.study.blog.repository.CommentRepository">
+    <sql id="selectComment">
+        SELECT id,user_id,content,create_time,blog_id
+        from comment
+    </sql>
+    <insert id="insertComment" useGeneratedKeys="true" keyProperty="id">
+        INSERT into comment(user_id,blog_id,content) VALUES (#{userId},#{blogId},#{content});
+    </insert>
+    <update id="incrementCommentCount">
+        UPDATE blog SET comment_count=comment_count+1 WHERE blog_id=#{blogId};
+    </update>
+    <update id="decrementCommentCount">
+        UPDATE blog SET comment_count=comment_count-1 WHERE blog_id=#{blogId};
+    </update>
+    <delete id="deleteComment">
+        DELETE
+        FROM comment
+        where id=#{id};
+    </delete>
+    <select id="findCommentById" resultType="com.study.blog.entity.Comment">
+        <include refid="selectComment"/>
+        WHERE id=#{id};
+    </select>
+    <select id="listComment" resultType="com.study.blog.entity.Comment">
+        <include refid="selectComment"/>
+        WHERE blog_id=#{blogId}
+    </select>
+
+</mapper>

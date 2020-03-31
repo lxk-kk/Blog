@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--通过命名空间映射到接口上-->
+<mapper namespace="com.study.blog.repository.AuthorityMapper">
+
+    <select id="getAuthority" resultType="com.study.blog.entity.Authority">
+        select authority_id ,authority_name  FROM authority where authority_id=#{id}
+    </select>
+
+</mapper>

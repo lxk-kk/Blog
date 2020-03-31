@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--通过命名空间映射到接口上-->
+<mapper namespace="com.study.blog.repository.BlogRepository">
+    <!--新建博客：与评论无关-->
+    <insert id="saveBlog" useGeneratedKeys="true" keyProperty="blogId">
+        INSERT into blog(user_id,title,summary,content,tags,html_content,create_time,catalog_id)
+        VALUES (#{userId},#{title},#{summary},#{content},#{tags},#{htmlContent},#{createTime},#{catalog.id});
+    </insert>
+    <!--更新博客：与评论无关-->
+    <update id="updateBlog">
+        UPDATE blog
+        SET user_id=#{userId},title=#{title},summary=#{summary},content=#{content},html_content=#{htmlContent},catalog_id=#{catalog.id},tags=#{tags}
+        where blog_id=#{blogId};
+    </update>
+    <!--阅读量更新：后期应该在redis中处理？-->
+    <update id="readingIncrement">
+        UPDATE blog set read_count = read_count+1 WHERE blog_id =#{id};
+    </update>
+    <!--
+        todo ：问题
+        博客删除：删除相应的所有评论
+        多表删除：blog表、comment表
+            原为：DELETE from blog WHERE blog_id=#{id}
+    DELETE blog,comment FROM blog,comment WHERE blog.blog_id=#{id} AND blog.blog_id=comment.blog_id
+    -->
+
+    <delete id="removeBlog">
+        DELETE blog,comment,vote
+        from blog
+        LEFT JOIN comment on blog.blog_id=comment.blog_id
+        LEFT JOIN vote on blog.blog_id=vote.blog_id
+        where blog.blog_id=#{id}
+    </delete>
+
+    <!--最热查询：List<Blog>-->
+    <select id="findByUserAndTitleLike" resultMap="returnBlog">
+        <include refid="selectBlog"/>
+        WHERE b.user_id=#{userId}
+        <if test="title != null">
+            and b.title like #{title} OR b.tags like #{title}
+        </if>
+    </select>
+
+    <!--最新查询：List<Blog>-->
+    <select id="findByTitleLikeAndOrderByTimeDesc" resultMap="returnBlog">
+        <include refid="selectBlog"/>
+        WHERE b.user_id=#{userId}
+        <if test="title != null">
+            and b.title like #{title} OR b.tags like #{title}
+        </if>
+        order by b.create_time desc
+    </select>
+
+    <!--分类查询：List<Blog>-->
+    <select id="findByCatalog" resultMap="returnBlog">
+        <include refid="selectBlog"/>
+        WHERE a.id=#{catalogId}
+    </select>
+
+    <!--单个查询：Blog-->
+    <select id="getBlogById" resultMap="returnBlog">
+        <include refid="selectBlog"/>
+        where b.blog_id=#{id}
+    </select>
+    <select id="getCreateTime" resultType="java.util.Date">
+        SELECT create_time from blog where blog_id=#{id};
+    </select>
+
+    <!--
+    【注意】
+        这里查询blog时不需要获取 List<Comment>
+        1、主页获取 List<Blog> 时，不需要显示 Comment
+        2、单个 Blog 查询时，可以从缓存中获取 Comment
+    -->
+    <sql id="selectBlog">
+        SELECT
+        b.blog_id,b.title,b.summary,b.content,b.html_content,b.read_count,b.comment_count,b.like_count,b.create_time,b.user_id,b.catalog_id,b.tags,
+        /* c.id,c.user_id,c.content,c.create_time,c.blog_id, */
+        a.id,a.name,a.user_id
+        from blog b
+       /* LEFT JOIN comment c ON b.blog_id=c.blog_id*/
+        LEFT JOIN catalog a ON b.catalog_id=a.id
+    </sql>
+
+    <resultMap id="returnBlog" type="com.study.blog.entity.Blog" autoMapping="false">
+        <id column="blog_id" property="blogId"/>
+        <result column="user_id" property="userId"/>
+        <result column="title" property="title"/>
+        <result column="summary" property="summary"/>
+        <result column="content" property="content"/>
+        <result column="html_content" property="htmlContent"/>
+        <result column="tags" property="tags"/>
+        <result column="read_count" property="readCount"/>
+        <result column="comment_count" property="commentCount"/>
+        <result column="like_count" property="likeCount"/>
+        <result column="create_time" property="createTime"/>
+        <association property="catalog" javaType="com.study.blog.entity.Catalog">
+            <id column="id" property="id"/>
+            <result column="name" property="name"/>
+            <result column="user_id" property="userId"/>
+        </association>
+        <!--
+        <collection property="comments" ofType="com.study.blog.entity.Comment">
+            <id column="c.id" property="id"/>
+            <result column="c.user_id" property="userId"/>
+            <result column="c.content" property="content"/>
+            <result column="c.create_time" property="createTime"/>
+            <result column="c.blog_id" property="blogId"/>
+        </collection>
+        -->
+    </resultMap>
+</mapper>
