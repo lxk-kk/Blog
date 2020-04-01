@@ -7,6 +7,7 @@ import java.util.Objects;
  * @author 10652
  * @date
  */
+@Deprecated
 public class BloomFilterUtil {
     /**
      * 容量：大概在 1.6*10^7 个数

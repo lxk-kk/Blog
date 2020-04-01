@@ -3,7 +3,6 @@ package com.study.blog.service.impl;
 import com.study.blog.entity.Catalog;
 import com.study.blog.repository.CatalogRepository;
 import com.study.blog.service.CatalogService;
-import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,7 +36,7 @@ public class CatalogServiceImpl implements CatalogService {
     }
 
     @Override
-    public Catalog updateCatalog(Catalog catalog){
+    public Catalog updateCatalog(Catalog catalog) {
         try {
             repository.update(catalog);
         } catch (Exception e) {

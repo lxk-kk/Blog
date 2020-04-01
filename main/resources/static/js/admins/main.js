@@ -1,12 +1,11 @@
 /**
  * Bolg main JS.
- * Created by lxk.com on 2017/3/9.
  */
 "use strict";
 //# sourceURL=main.js
 
 // DOM 加载完再执行
-$(function () {
+$(function () {~
 
     // 菜单事件
     $(".blog-menu .list-group-item").click(function () {

@@ -1,5 +1,6 @@
 package com.study.blog.controller;
 
+import com.study.blog.annotation.ValidateAnnotation;
 import com.study.blog.entity.Comment;
 import com.study.blog.entity.ID;
 import com.study.blog.entity.User;
@@ -77,6 +78,7 @@ public class CommentController {
     @PostMapping
     @ResponseBody
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_USER')")
+    @ValidateAnnotation(authorityId = 2)
     public ResponseEntity<ResultVO> publishComment(@RequestBody @Validated ParamVO paramVO, BindingResult
             bindingResult) {
         if (bindingResult.hasErrors()) {
@@ -110,6 +112,7 @@ public class CommentController {
      * @return 处理结果
      */
     @DeleteMapping("/{id}")
+    @ValidateAnnotation(authorityId = 2)
     public ResponseEntity<ResultVO> deleteComment(@PathVariable("id") Long id, Long blogId) {
         log.info("删除评论！");
         // 判断操作用户是否是博客/评论的所有者

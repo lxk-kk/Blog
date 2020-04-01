@@ -30,9 +30,10 @@ public interface BlogEvaluationCacheService {
      * 根据 blogId 获取 vote list
      *
      * @param blogId blogId
+     * @param userId
      * @return vote list
      */
-    List<Vote> getBlogVoteListByBlogId(Long blogId);
+    Long judgeVotedById(Long blogId, Integer userId);
 
     /**
      * 通过 blogId voteId 获取 vote

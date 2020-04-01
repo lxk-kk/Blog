@@ -66,12 +66,13 @@
                     </h5>
 
                     <!--标签显示：每个标签都可以作为查询的关键字-->
-                   <h5>
-                       标签：
-                       <a th:each="tag : ${#strings.arraySplit(blogModel.tags,',')}" th:href="'/u/'+${blogEditor.username}+ '/blogs?keyword='+${tag}">
-                           <span class="badge badge-default" th:text="${tag}">Web Design</span>
-                       </a>
-                   </h5>
+                    <h5>
+                        标签：
+                        <a th:each="tag : ${#strings.arraySplit(blogModel.tags,',')}"
+                           th:href="'/u/'+${blogEditor.username}+ '/blogs?keyword='+${tag}">
+                            <span class="badge badge-default" th:text="${tag}">Web Design</span>
+                        </a>
+                    </h5>
                 </div>
 
                 <!--评论框-->

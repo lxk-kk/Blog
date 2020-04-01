@@ -1,9 +1,9 @@
 package com.study.blog.controller;
 
 import com.github.pagehelper.Page;
+import com.study.blog.annotation.ValidateAnnotation;
 import com.study.blog.entity.Authority;
 import com.study.blog.entity.User;
-import com.study.blog.exception.BeanValidationExceptionHandler;
 import com.study.blog.service.AuthorityService;
 import com.study.blog.service.impl.UserServiceImpl;
 import com.study.blog.util.EntityTransfer;
@@ -23,6 +23,7 @@ import org.thymeleaf.expression.Strings;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.ConstraintViolationException;
+import javax.xml.ws.soap.Addressing;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -43,12 +44,6 @@ public class UserController {
     private final UserServiceImpl service;
     private final AuthorityService authorityService;
 
-    /**
-     * fileServerUrl会在配置文件（application.yml）中进行配置，并在此处获取
-     */
-    // @Value("${file.server.url}")
-    private String fileServerUrl;
-
     @Autowired
     public UserController(UserServiceImpl service, AuthorityService authorityService) {
         this.authorityService = authorityService;
@@ -62,6 +57,7 @@ public class UserController {
      * @return 用户列表页面
      */
     @GetMapping
+    @ValidateAnnotation
     public ModelAndView listUser(
             @RequestParam(value = "async", required = false) boolean async,
             @RequestParam(value = "pageIndex", required = false, defaultValue = "0") int pageIndex,
@@ -78,10 +74,6 @@ public class UserController {
         model.addAttribute("users", userVOS);
         Strings strings = new Strings(Locale.CHINA);
         request.setAttribute("strings", strings);
-        /*
-            延迟加载为真？
-                #mainContaineRepleace？？？？
-         */
         return new ModelAndView(async ? "users/list :: #mainContainerRepleace" : "users/list", "userModel", model);
     }
 
@@ -93,6 +85,7 @@ public class UserController {
      * @return 用户详情页面
      */
     @GetMapping("/{id}")
+    @ValidateAnnotation
     ModelAndView searchById(@PathVariable("id") int id, Model model) {
         // 将 user 转换为 userVO 前端展示
         model.addAttribute("user", EntityTransfer.userToVO(service.searchById(id)));
@@ -107,6 +100,7 @@ public class UserController {
      * @return 具有form表单的用户信息填写页面
      */
     @GetMapping("/add")
+    @ValidateAnnotation
     ModelAndView createUser(Model model) {
         model.addAttribute("user", new User());
         return new ModelAndView("users/add", "userModel", model);
@@ -120,6 +114,7 @@ public class UserController {
      * @return 具有form表单的用户信息填写页面
      */
     @GetMapping("/edit/{id}")
+    @ValidateAnnotation
     ModelAndView updateUser(@PathVariable("id") int id, Model model) {
         model.addAttribute("user", service.searchById(id));
         return new ModelAndView("users/edit", "userModel", model);
@@ -127,13 +122,12 @@ public class UserController {
 
     /**
      * 保存或者更新用户
-     * <p>
-     * 参数不需要添加注解？
      *
      * @param user 用户
      * @return 重定向到用户列表页面
      */
     @PostMapping
+    @ValidateAnnotation
     ResponseEntity<ResultVO> saveOrUpdate(Integer authorityId, @Validated User user, BindingResult result) {
         if (result.hasErrors()) {
             log.error("用户信息出错");
@@ -160,9 +154,8 @@ public class UserController {
             try {
                 service.updateUser(user);
             } catch (ConstraintViolationException e) {
-                String errorMsg = BeanValidationExceptionHandler.getExceptionMessage(e);
-                log.error("【更新用户信息 ：Bean 校验异常】{}", errorMsg);
-                return ResponseEntity.ok().body(new ResultVO(false, errorMsg));
+                log.error("【更新用户信息 ：Bean 校验异常】{}", e.getMessage());
+                return ResponseEntity.ok().body(new ResultVO(false, e.getMessage()));
             }
 
         } else {
@@ -171,7 +164,7 @@ public class UserController {
             try {
                 service.createUser(user);
             } catch (ConstraintViolationException e) {
-                String errorMsg = BeanValidationExceptionHandler.getExceptionMessage(e);
+                String errorMsg = e.getMessage();
                 log.error("【新增用户 ：Bean 校验异常】{}", errorMsg);
                 return ResponseEntity.ok().body(new ResultVO(false, errorMsg));
             }
@@ -186,6 +179,7 @@ public class UserController {
      * @return 重定向到用户列表
      */
     @DeleteMapping("/delete/{id}")
+    @ValidateAnnotation
     ResponseEntity<ResultVO> deleteUser(@PathVariable("id") int id) {
         try {
             service.deleteUser(id);
@@ -204,11 +198,10 @@ public class UserController {
      */
     @GetMapping("/{username}/profile")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation
     public ModelAndView profile(@PathVariable("username") String username, ModelAndView modelAndView) {
         User user = (User) service.loadUserByUsername(username);
         modelAndView.addObject("user", user);
-        // 将文件服务器的地址返回给客户端：通过该文件服务器的地址查询到用户的头像的具体位置
-        modelAndView.addObject("fileServerUrl", fileServerUrl);
         modelAndView.setViewName("/userspace/profile");
         modelAndView.setViewName("userModel");
         return modelAndView;
@@ -221,6 +214,7 @@ public class UserController {
      */
     @PostMapping("/{username}/profile")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation
     public String saveProfile(@PathVariable("username") String username, User user) {
         log.info("修改用户信息");
 
@@ -243,6 +237,7 @@ public class UserController {
      */
     @GetMapping("/{username}/avatar")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation
     public ModelAndView avatar(@PathVariable("username") String username, ModelAndView modelAndView) {
         User originUser = service.findOneByUsername(username);
         modelAndView.addObject("user", originUser);
@@ -260,6 +255,7 @@ public class UserController {
      */
     @PostMapping("/{username}/avatar")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation
     public ResponseEntity<ResultVO> avatar(@PathVariable("username") String username, @RequestBody User user) {
         String avatar = user.getAvatar();
         User originUser = service.findOneByUsername(username);

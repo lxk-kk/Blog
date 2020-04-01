@@ -6,6 +6,9 @@ import lombok.Data;
 import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 
+/**
+ * @author 10652
+ */
 @Data
 public class CatalogVO implements Serializable {
     private static final long serialVersionUID = -7936086599700202861L;

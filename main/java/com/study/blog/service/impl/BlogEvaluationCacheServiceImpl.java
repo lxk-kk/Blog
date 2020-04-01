@@ -11,9 +11,11 @@ import com.study.blog.service.BlogEvaluationCacheService;
 import com.study.blog.util.BlogEvaluationUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -101,28 +103,21 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * 根据 blogId 获取 vote list
      *
      * @param blogId blogId
+     * @param userId userId
      * @return vote list
      */
     @Override
-    public List<Vote> getBlogVoteListByBlogId(Long blogId) {
-        List<Vote> votes;
-        if (Objects.isNull(blogId)) {
-            // todo
-            log.error("【获取点赞列表】 blogId 为空");
-        }
+    public Long judgeVotedById(Long blogId, Integer userId) {
         String voteKey = BlogEvaluationUtil.generateKey(EvaluationConstant.VOTE, blogId);
-        List<Object> voteObj = redisTemplate.opsForHash().values(voteKey);
-
-        log.info("【点赞列表】{}", voteObj);
-        try {
-            votes = voteObj.stream().map(
-                    vote -> JSONObject.parseObject(vote.toString(), Vote.class)).collect(Collectors.toList()
-            );
-        } catch (Exception e) {
-            log.info("【获取点赞列表】 json->Vote 转换失败");
-            votes = getBlogEvaluationByBlogId2Mysql(blogId).getVotes();
-        }
-        return votes;
+        String userKey = BlogEvaluationUtil.generateKey(EvaluationConstant.USER_ID, userId);
+        DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
+        redisScript.setLocation(new ClassPathResource("lua/judgevoted.lua"));
+        redisScript.setResultType(Long.class);
+        ArrayList<String> voteKeyList = new ArrayList<>(1);
+        ArrayList<String> userKeyList = new ArrayList<>(1);
+        voteKeyList.add(voteKey);
+        userKeyList.add(userKey);
+        return redisTemplate.execute(redisScript, voteKeyList, userKeyList);
     }
 
     /**
@@ -282,43 +277,11 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
                 log.error("【 voteCount ：redis -> mysql 】类型转换异常:{}", e.getMessage());
             }
         }
-
-        // comment List
-        /*cursor = redisTemplate.opsForHash().scan(EvaluationConstant.COMMENT + "*", ScanOptions.NONE);
-        List<Comment> comments = new ArrayList<>(1);
-        while (cursor.hasNext()) {
-            entry = cursor.next();
-            try {
-                comments.add(JSONObject.parseObject(entry.getValue().toString(), Comment.class));
-            } catch (Exception e) {
-                // todo 类型转换异常
-                log.error("【 comment list ：redis -> mysql 】类型转换异常:{}", e.getMessage());
-            }
-        }*/
-        // vote List
-        /*cursor = redisTemplate.opsForHash().scan(EvaluationConstant.VOTE + "*", ScanOptions.NONE);
-        List<Vote> votes = new ArrayList<>(1);
-        while (cursor.hasNext()) {
-            entry = cursor.next();
-            try {
-                votes.add(JSONObject.parseObject(entry.getValue().toString(), Vote.class));
-            } catch (Exception e) {
-                // todo 类型转换异常
-                log.error("【 vote list ：redis -> mysql 】类型转换异常:{}", e.getMessage());
-            }
-        }*/
         if (readCountMap.size() > 0 || commentCountMap.size() > 0 || voteCountMap.size() > 0) {
             log.info("readCount:{}  |  commentCount:{}   |   voteCount:{}", readCountMap, commentCountMap,
                     voteCountMap);
             blogEvaluationRepository.saveBlogEvaluation(readCountMap, commentCountMap, voteCountMap);
         }
-        /*
-        if (comments.size() > 0) {
-            blogEvaluationRepository.saveCommentList(comments);
-        }
-        if (votes.size() > 0) {
-            blogEvaluationRepository.saveVoteList(votes);
-        }*/
     }
 
     /**
@@ -334,10 +297,6 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
         Object readCountObj = redisTemplate.opsForHash().get(EvaluationConstant.READING_COUNT, blogId);
         Object commentCountObj = redisTemplate.opsForHash().get(EvaluationConstant.COMMENT_COUNT, blogId);
         Object voteCountObj = redisTemplate.opsForHash().get(EvaluationConstant.VOTE_COUNT, blogId);
-        /*String commentKey = BlogEvaluationUtil.generateKey(EvaluationConstant.COMMENT, blogId);
-        String voteKey = BlogEvaluationUtil.generateKey(EvaluationConstant.VOTE, blogId);
-        List<Object> commentObj = redisTemplate.opsForHash().values(commentKey);
-        List<Object> voteObj = redisTemplate.opsForHash().values(voteKey);*/
 
         log.info("【查询缓存】");
         if (Objects.isNull(readCountObj) || Objects.isNull(commentCountObj) || Objects.isNull(voteCountObj)) {
@@ -352,12 +311,6 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
             blogEvaluation.setReadingCount(JSONObject.parseObject(readCountObj.toString(), Integer.class));
             blogEvaluation.setCommentCount(JSONObject.parseObject(commentCountObj.toString(), Integer.class));
             blogEvaluation.setVoteCount(JSONObject.parseObject(voteCountObj.toString(), Integer.class));
-            /*blogEvaluation.setComments(commentObj.stream().map(
-                    comment -> JSONObject.parseObject(comment.toString(), Comment.class)
-            ).collect(Collectors.toList()));
-            blogEvaluation.setVotes(voteObj.stream().map(
-                    vote -> JSONObject.parseObject(vote.toString(), Vote.class)
-            ).collect(Collectors.toList()));*/
         } catch (Exception e) {
             log.error("【缓存】blog:{} json 转换异常", blogId, e.getMessage());
             return null;

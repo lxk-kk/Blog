@@ -1,9 +1,6 @@
 /*!
   * Bolg main JS.
- * 
- * @since: 1.0.0 2017/3/9
- * @author Way Lau <https://lxk.com>
- */
+  */
 "use strict";
 //# sourceURL=main.js
 

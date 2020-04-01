@@ -20,6 +20,11 @@ public class EvaluationConstant {
      * 点赞
      */
     public static final String VOTE = "EVALUATION_VOTE";
+
+    /**
+     * user id
+     */
+    public static final String USER_ID = "\"userId\"";
     /**
      * 点赞量
      */

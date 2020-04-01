@@ -1,5 +1,6 @@
 package com.study.blog.controller;
 
+import com.study.blog.annotation.ValidateAnnotation;
 import com.study.blog.vo.Menu;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,14 +30,10 @@ public class AdminController {
      * @return 后台管理的主页
      */
     @GetMapping
+    @ValidateAnnotation
     public ModelAndView listUsers(Model model) {
         List<Menu> list = new ArrayList(1);
         list.add(new Menu("用户管理", "/users"));
-        /*
-        list.add(new Menu("角色管理", "/roles"))
-        list.add(new Menu("博客管理", "/blogs"))
-        list.add(new Menu("评论管理", "/comments"))
-        */
         model.addAttribute("list", list);
         return new ModelAndView("admins/index", "menuList", model);
     }

@@ -1,8 +1,5 @@
 /*!
  * blogedit.html 页面脚本.
- * 
- * @since: 1.0.0 2017-03-26
- * @author lxk <https://lxk.com>
  */
 "use strict";
 //# sourceURL=blogedit.js
@@ -18,10 +15,8 @@ $(function () {
         },
         resize: 'vertical',
         localStorage: 'md',
-        imgurl: 'http://47.103.77.143/file',
-        base64url: 'http://47.103.77.143/file'
-        // imgurl: 'http://localhost:9090/file',
-        // base64url: 'http://localhost:9090/file'
+        imgurl: 'http://localhost:9090/file',
+        base64url: 'http://localhost:9090/file'
     });
 
     // 初始化下拉

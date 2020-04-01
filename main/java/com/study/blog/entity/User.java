@@ -69,22 +69,6 @@ public class User implements UserDetails, Serializable {
     private List<Authority> authorities;
 
     /**
-     * 需要实现该方法：在获取 Authority 用户角色时，能够返回角色的名称
-     * @return 角色列表
-     */
-   /* @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        // 需要将List<Authority>转换成List<SimpleGrantedAuthority>，否则前端拿不到角色里列表名称
-        List<SimpleGrantedAuthority> authorityList = new ArrayList<>(1);
-        log.info("authorities：{}", this.authorities);
-        log.info("username：{}", this.username);
-        for (Authority auth : authorities) {
-            authorityList.add(new SimpleGrantedAuthority(auth.getAuthority()));
-        }
-        return authorityList;
-    }*/
-
-    /**
      * 为 authorities 单独新建一个get方法，获取原生的Authority对象列表，不知道为什么，上面个方法只能获取到authorityName，而获取不到authorityId
      *
      * @return Authority

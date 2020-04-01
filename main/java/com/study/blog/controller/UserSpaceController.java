@@ -1,6 +1,7 @@
 package com.study.blog.controller;
 
 import com.github.pagehelper.Page;
+import com.study.blog.annotation.ValidateAnnotation;
 import com.study.blog.entity.Blog;
 import com.study.blog.entity.Catalog;
 import com.study.blog.entity.User;
@@ -62,6 +63,7 @@ public class UserSpaceController {
      * @return 用户主页（返回到网页）
      */
     @GetMapping("/{username}")
+    @ValidateAnnotation(authorityId = 2)
     public String userSpace(@PathVariable("username") String username, Model model) {
         User user = (User) userService.loadUserByUsername(username);
         // 这个user 属性应该没用，下面是 redirect
@@ -77,6 +79,7 @@ public class UserSpaceController {
      * @return 模型视图
      */
     @GetMapping("/{username}/profile")
+    @ValidateAnnotation(authorityId = 2)
     @PreAuthorize("authentication.name.equals(#username)")
     public ModelAndView profile(@PathVariable("username") String username, Model model,RedirectAttributes attributes) {
         User user = (User) userService.loadUserByUsername(username);
@@ -98,6 +101,7 @@ public class UserSpaceController {
      */
     @PostMapping("/{username}/profile")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation(authorityId = 2)
     public String saveProfile(@PathVariable("username") String username, @Validated User user, BindingResult result,
                               ModelAndView model) {
 
@@ -125,6 +129,7 @@ public class UserSpaceController {
      */
     @GetMapping("/{username}/avatar")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation(authorityId = 2)
     public ModelAndView avatar(@PathVariable("username") String username, Model model) {
         User user = userService.findOneByUsername(username);
         model.addAttribute("user", user);
@@ -140,6 +145,7 @@ public class UserSpaceController {
      */
     @PostMapping("/{username}/avatar")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation(authorityId = 2)
     public ResponseEntity<ResultVO> avatar(@PathVariable("username") String username, @RequestBody User user) {
         log.info("user:{}", user);
         userService.updateUserAvatar(username, user.getAvatar());
@@ -156,6 +162,7 @@ public class UserSpaceController {
      * @return 博客列表页
      */
     @GetMapping("/{username}/blogs")
+    @ValidateAnnotation(authorityId = 2)
     public String listBlogsByOrder(@PathVariable("username") String username,
                                    @RequestParam(value = "order", required = false, defaultValue = "new") String order,
                                    @RequestParam(value = "catalog", required = false) Long catalogId,
@@ -205,6 +212,7 @@ public class UserSpaceController {
      * @return 具体的博客页面
      */
     @GetMapping("/{username}/blogs/{id}")
+    @ValidateAnnotation(authorityId = 2)
     public String getBlogById(@PathVariable("username") String username, @PathVariable("id") Long id, Model
             model) {
 
@@ -254,6 +262,7 @@ public class UserSpaceController {
      */
     @DeleteMapping("/{username}/blogs/{id}")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation(authorityId = 2)
     public ResponseEntity removeBlog(@PathVariable("username") String username, @PathVariable("id") Long id) {
         try {
             blogService.removeBlog(id);
@@ -271,6 +280,7 @@ public class UserSpaceController {
      * @return model
      */
     @GetMapping("/{username}/blogs/edit")
+    @ValidateAnnotation(authorityId = 2)
     public ModelAndView createBlog(@PathVariable("username") String username, Model model) {
         // 将用户自己的分类列表返回，供用户编辑博客时使用！
         User user = (User) userService.loadUserByUsername(username);
@@ -287,6 +297,7 @@ public class UserSpaceController {
      * @return model
      */
     @GetMapping("/{username}/blogs/edit/{id}")
+    @ValidateAnnotation(authorityId = 2)
     public ModelAndView createBlog(@PathVariable("username") String username, @PathVariable("id") Long id, Model
             model) {
         // 将用户自己的分类列表返回，供用户编辑博客时使用！
@@ -307,6 +318,7 @@ public class UserSpaceController {
      * @return 博客页面：后续重定向到该博客页
      */
     @PostMapping("/{username}/blogs/edit")
+    @ValidateAnnotation(authorityId = 2)
     @PreAuthorize(value = "authentication.name.equals(#username)")
     public ResponseEntity saveBlog(@PathVariable("username") String username, @RequestBody @Validated Blog blog,
                                    BindingResult result) {

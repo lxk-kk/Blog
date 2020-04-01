@@ -110,8 +110,13 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         userMapper.saveUserAvatar(username, avatarUrl);
     }
 
+    @Override
+    public User validateUser(String username, String password) {
+        return new User();
+    }
+
     /**
-     * 实现 Use人DetailsService 接口：根据用户账号加载用户认证信息
+     * 实现 UserDetailsService 接口：根据用户账号加载用户认证信息
      *
      * @param username 用户名
      * @return User

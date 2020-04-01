@@ -82,16 +82,6 @@
         using(id)
     </select>
 
-    <!-- 未使用分页组件 PageHelper
-    <select id="findByName" resultType="com.study.blog.entity.User">
-        select id,username,email,avatar
-        from user
-        inner JOIN (select id from user where name LIKE #{name} limit #{pageIndex},#{pageSize})
-        using(id);
-    </select>
-    -->
-
-
     <select id="findUsersByUsernames" resultMap="selectUser">
         <include refid="selectUserWithoutPassword"/>
         WHERE u.username IN

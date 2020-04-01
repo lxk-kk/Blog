@@ -123,7 +123,7 @@ public class BlogServiceImpl implements BlogService {
     @Transactional(rollbackFor = Throwable.class)
     @Override
     public void readingIncrement(Long id) {
-        // blogRepository.readingIncrement(id);
+        // blogRepository.readingIncrement(id)
         Long count = cacheService.incrementBlogReading(id);
         count = Objects.isNull(count) ? 0L : count;
         Integer readCount = Math.toIntExact(count);
@@ -194,17 +194,12 @@ public class BlogServiceImpl implements BlogService {
     @Override
     public Page<Blog> listBlogsByTitleLikeAndDescSort(int userId, String title, int startPage, int pageSize) {
         // 模糊查询
-        // TitleLike  UserOrTagsLike UserOrder  CreateTimeDesc(title,user, tags,user, pageable);
         log.info("【博客列表】 userId={}", userId);
         if (title != null) {
             title = "%" + title + "%";
         }
         log.info("title:{}", title);
-        Page<Blog> blogPage = blogRepository.findByTitleLikeAndOrderByTimeDesc(userId, title, startPage, pageSize);
-/*        for (Blog blog : blogPage) {
-            blogCacheEvaluation(blog);
-        }*/
-        return blogPage;
+        return blogRepository.findByTitleLikeAndOrderByTimeDesc(userId, title, startPage, pageSize);
     }
 
     /**
@@ -223,9 +218,6 @@ public class BlogServiceImpl implements BlogService {
             title = "%" + title + "%";
         }
         Page<Blog> blogPage = blogRepository.findByUserAndTitleLike(userId, title, startPage, pageSize);
-/*        for (Blog blog : blogPage) {
-            blogCacheEvaluation(blog);
-        }*/
         return blogPage;
     }
 
@@ -240,9 +232,6 @@ public class BlogServiceImpl implements BlogService {
     @Override
     public Page<Blog> listBlogByCatalog(Long catalogId, int pageNum, int pageSize) {
         Page<Blog> blogPage = blogRepository.findByCatalog(catalogId, pageNum, pageSize);
-/*        for (Blog blog : blogPage) {
-            blogCacheEvaluation(blog);
-        }*/
         return blogPage;
     }
 

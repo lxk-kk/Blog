@@ -102,14 +102,5 @@
             <result column="name" property="name"/>
             <result column="user_id" property="userId"/>
         </association>
-        <!--
-        <collection property="comments" ofType="com.study.blog.entity.Comment">
-            <id column="c.id" property="id"/>
-            <result column="c.user_id" property="userId"/>
-            <result column="c.content" property="content"/>
-            <result column="c.create_time" property="createTime"/>
-            <result column="c.blog_id" property="blogId"/>
-        </collection>
-        -->
     </resultMap>
 </mapper>

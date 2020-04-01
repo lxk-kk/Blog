@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Component
+@Deprecated
 public class RedisDistributedLock {
     /**
      * 过期时长（s）：30 s

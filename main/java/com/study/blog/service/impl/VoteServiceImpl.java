@@ -12,7 +12,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -38,7 +37,7 @@ public class VoteServiceImpl implements VoteService {
             log.error("【取消点赞】点赞记录：为空！ ");
         }
         /*
-        List<Vote> votes = cacheService.getBlogVoteListByBlogId(blogId)
+        List<Vote> votes = cacheService.judgeVotedById(blogId)
         Integer userId = -1
         for (Vote vote : votes) {
             if (Objects.equals(vote.getId(), voteId)) {
@@ -57,18 +56,20 @@ public class VoteServiceImpl implements VoteService {
     @Override
     public Long isVoted(Long blogId, Integer userId) {
         // 从缓存中查询 todo
-        List<Vote> votes = cacheService.getBlogVoteListByBlogId(blogId);
+        /*List<Vote> votes = cacheService.judgeVotedById(blogId,userId);
         log.info("【list<Vote> 】:{}", votes);
         for (Vote vote : votes) {
             if (Objects.equals(vote.getUserId(), userId)) {
                 return vote.getId();
             }
-        }
+        }*/
         /*
         Integer isVoted = repository.isVoted(new Vote(blogId, userId))
         return Objects.isNull(isVoted) ? 0 : isVoted;
         */
-        return (long) 0;
+        Long longv = cacheService.judgeVotedById(blogId, userId);
+        log.info("longv:{}", longv);
+        return longv;
     }
 
     @Transactional(rollbackFor = Throwable.class)

@@ -84,7 +84,8 @@
                                 <i class="fa fa-bars" aria-hidden="true"></i>
                                 分类
                                 <!--只允许本人增加分类-->
-                                <a href="javascript:void(0)" th:if="${isCatalogsOwner}" class="blog-add-catalog blog-right"
+                                <a href="javascript:void(0)" th:if="${isCatalogsOwner}"
+                                   class="blog-add-catalog blog-right"
                                    data-toggle="modal" data-target="#flipFlop" role="button">
                                     <i class="fa fa-plus" aria-hidden="true"></i>
                                 </a>
@@ -92,7 +93,8 @@
 
                             <ul class="list-group" th:each="catalog : ${catalogs}" th:object="${catalog}">
                                 <div class="blog-list-group-item">
-                                    <a href="javascript:void(0)" th:attr="catalogId=*{id}" class="blog-query-by-catalog">
+                                    <a href="javascript:void(0)" th:attr="catalogId=*{id}"
+                                       class="blog-query-by-catalog">
                                         [[*{name}]]
                                     </a>
                                     <span class="blog-right">

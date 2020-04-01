@@ -58,7 +58,7 @@ spring:
     port: 63790
     host: localhost
     timeout: 120s
-    password: qwertyuiop09901221-==-
+    # password: ****
 mybatis:
   config-location: classpath:mybatis/mybatis-config.xml
   #配置了mapper-locations，则不用再mybatis-config配置文件配置相应的mapper标签

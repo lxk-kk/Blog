@@ -1,5 +1,6 @@
 package com.study.blog.controller;
 
+import com.study.blog.annotation.ValidateAnnotation;
 import com.study.blog.entity.User;
 import com.study.blog.service.VoteService;
 import com.study.blog.vo.ResultVO;
@@ -36,6 +37,7 @@ public class VoteController {
      */
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_USER')")
     @PostMapping
+    @ValidateAnnotation(authorityId = 2)
     public ResponseEntity<ResultVO> voteBlog(@RequestParam Long blogId) {
         log.info("博客点赞：{}", blogId);
         try {
@@ -57,6 +59,7 @@ public class VoteController {
      */
     @DeleteMapping("/{blogId}/{voteId}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_USER')")
+    @ValidateAnnotation(authorityId = 2)
     public ResponseEntity<ResultVO> removeVote(@PathVariable("blogId") Long blogId, @PathVariable("voteId") Long
             voteId) {
         log.info("取消点赞");

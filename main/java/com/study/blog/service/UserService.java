@@ -40,15 +40,17 @@ public interface UserService {
 
     /**
      * 通过用户名模糊查询博客用户（用户名并不是用户的唯一标识）
-     * @param name 用户名
+     *
+     * @param name      用户名
      * @param pageIndex 起始页
-     * @param pageSize 每页的大小
+     * @param pageSize  每页的大小
      * @return 用户列表
      */
     Page<User> listUsersByName(String name, int pageIndex, int pageSize);
 
     /**
      * 根据用户名列表获取用户列表
+     *
      * @param usernameList 用户名列表
      * @return 用户列表
      */
@@ -56,6 +58,7 @@ public interface UserService {
 
     /**
      * 通过用户账号查找用户（用户账号是唯一标识）
+     *
      * @param username 用户账号
      * @return 用户
      */
@@ -63,8 +66,16 @@ public interface UserService {
 
     /**
      * 更新用户头像
-     * @param username 用户名
+     *
+     * @param username  用户名
      * @param avatarUrl 头像URL
      */
     void updateUserAvatar(String username, String avatarUrl);
+
+    /**
+     * @param username 用户名
+     * @param password 密码
+     * @return 用户
+     */
+    User validateUser(String username, String password);
 }

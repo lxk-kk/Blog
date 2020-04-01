@@ -44,25 +44,29 @@
             <!-- 个人设置 -->
             <div class="card ">
                 <h5 class="card-header"><i class="fa fa-cog" aria-hidden="true"></i> 个人设置</h5>
-                <span th:if="${userModel.msg} != null" style="color: red; font-weight: bold" th:text="${userModel.msg}"></span>
+                <span th:if="${userModel.msg} != null" style="color: red; font-weight: bold"
+                      th:text="${userModel.msg}"></span>
                 <div class="card-block">
                     <!--
                     {pathVariable}(pathVariable=${node.getPerson().getName()})
                         th:action="@{/u/{pathVariable}/profile(pathVariable=${userModel.user.username})}"
                     th:action="@{'/u/'+${pathVariable}+'/profile'}"
                     -->
-                    <form th:action="@{/u/{pathVariable}/profile(pathVariable=${userModel.user.username})}" method="post" th:object="${userModel.user}" id="userForm">
+                    <form th:action="@{/u/{pathVariable}/profile(pathVariable=${userModel.user.username})}"
+                          method="post" th:object="${userModel.user}" id="userForm">
                         <input type="hidden" name="id" id="userId" th:value="*{id}">
 
                         <div class="form-group ">
                             <label for="username" class="col-form-label">账号</label>
                             <!--账号不允许修改：只读-->
-                            <input type="text" class="form-control" id="username" name="username" required th:value="*{username}"
+                            <input type="text" class="form-control" id="username" name="username" required
+                                   th:value="*{username}"
                                    readonly="readonly">
                         </div>
                         <div class="form-group">
                             <label for="email" class="col-form-label">邮箱</label>
-                            <input type="email" class="form-control" id="email" name="email" th:value="*{email}" required
+                            <input type="email" class="form-control" id="email" name="email" th:value="*{email}"
+                                   required
                                    maxlength="50" placeholder="请输入邮箱">
                         </div>
                         <div class="form-group">

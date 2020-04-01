@@ -7,7 +7,6 @@ package com.study.blog.exception;
  */
 public class NullBlogException extends RuntimeException {
     int status;
-
     public NullBlogException(String message) {
         super(message);
     }

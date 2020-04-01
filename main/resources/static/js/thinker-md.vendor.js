@@ -1396,8 +1396,8 @@ hljs.registerLanguage('aspectj', function (hljs) {
             hljs.C_BLOCK_COMMENT_MODE,
             hljs.APOS_STRING_MODE,
             hljs.QUOTE_STRING_MODE, {
-                className: 'aspect',
-                beginKeywords: 'aspect',
+                className: 'interceptor',
+                beginKeywords: 'interceptor',
                 end: /[{;=]/,
                 excludeEnd: true,
                 illegal: /[:;"\[\]]/,
@@ -6867,7 +6867,7 @@ hljs.registerLanguage('ocaml', function (hljs) {
     }
 });
 hljs.registerLanguage('oxygene', function (hljs) {
-    var OXYGENE_KEYWORDS = 'abstract add and array as asc aspect assembly async begin break block by case class concat const copy constructor continue ' +
+    var OXYGENE_KEYWORDS = 'abstract add and array as asc interceptor assembly async begin break block by case class concat const copy constructor continue ' +
         'create default delegate desc distinct div do downto dynamic each else empty end ensure enum equals event except exit extension external false ' +
         'final finalize finalizer finally flags for forward from function future global group has if implementation implements implies in index inherited ' +
         'inline interface into invariants is iterator join locked locking loop matching method mod module namespace nested new nil not notify nullable of ' +

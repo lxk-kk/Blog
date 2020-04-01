@@ -15,8 +15,8 @@ public class AuthorityServiceImpl implements AuthorityService {
     private final AuthorityMapper mapper;
 
     @Autowired
-    AuthorityServiceImpl(AuthorityMapper mapper){
-        this.mapper=mapper;
+    AuthorityServiceImpl(AuthorityMapper mapper) {
+        this.mapper = mapper;
     }
 
     @Override

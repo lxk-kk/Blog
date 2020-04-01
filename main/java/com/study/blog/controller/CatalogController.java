@@ -1,5 +1,6 @@
 package com.study.blog.controller;
 
+import com.study.blog.annotation.ValidateAnnotation;
 import com.study.blog.entity.Catalog;
 import com.study.blog.entity.User;
 import com.study.blog.service.CatalogService;
@@ -84,6 +85,7 @@ public class CatalogController {
      */
     @PostMapping
     @PreAuthorize("authentication.name.equals(#catalogVO.username)")
+    @ValidateAnnotation(authorityId = 2)
     public ResponseEntity<ResultVO> create(@RequestBody @Validated CatalogVO catalogVO, BindingResult result) {
         if (result.hasErrors()) {
             return ResponseEntity.ok().body(new ResultVO(false,result.getFieldError().getDefaultMessage()));
@@ -118,6 +120,7 @@ public class CatalogController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("authentication.name.equals(#username)")
+    @ValidateAnnotation(authorityId = 2)
     public ResponseEntity<ResultVO> delete(String username, @PathVariable("id") Long id) {
         try {
             catalogService.removeCatalog(id);
@@ -134,6 +137,7 @@ public class CatalogController {
      * @return 编辑页面
      */
     @GetMapping("/edit")
+    @ValidateAnnotation(authorityId = 2)
     public String getCatalogEdit(Model model) {
         log.info("跳转分类编辑页面");
         Catalog catalog = new Catalog();
@@ -149,6 +153,7 @@ public class CatalogController {
      * @return 编辑页面
      */
     @GetMapping("/edit/{id}")
+    @ValidateAnnotation(authorityId = 2)
     public String getCatalogById(@PathVariable("id") Long id, Model model) {
         Catalog catalog = catalogService.getCatalogById(id);
         model.addAttribute("catalog", catalog);

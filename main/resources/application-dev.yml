@@ -15,8 +15,7 @@ spring:
           tcp:
             connect_timeout: 120s
     mongodb:
-      # 连接服务器上的 mongodb 服务器通过nginx将端口封闭(并没有实现)
-      uri: mongodb://47.103.77.143:27017/blog
+      uri: mongodb://localhost:27017/blog
 
   datasource:
     username: root
@@ -56,9 +55,11 @@ spring:
       max-file-size: 10MB
   redis:
     port: 63790
-    host: 47.103.77.143
+    host: localhost
     timeout: 120s
-    password: qwertyuiop09901221-==-
+    # password: ***
+  session:
+    store-type: redis
 mybatis:
   config-location: classpath:mybatis/mybatis-config.xml
   #配置了mapper-locations，则不用再mybatis-config配置文件配置相应的mapper标签
@@ -69,10 +70,15 @@ mybatis:
 # 该地址需要返回给前端，在需要地方 通过@Value注解就可以取得该文件服务器的地址：@Value("${file.server.url}")
 #file:
 #  server:
-#    ip: 47.103.77.143
+#    ip: localhost
 #    port: 27017
+
+
+# 暂不启用新的登录方式
+validate:
+  start: no
+
 pagehelper:
   reasonable: true
   params: pageNum=pageIndex;pageSize=pageSize
   support-methods-arguments: true
-
