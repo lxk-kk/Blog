@@ -9,6 +9,7 @@ import com.study.blog.service.BlogService;
 import com.study.blog.service.CatalogService;
 import com.study.blog.service.VoteService;
 import com.study.blog.service.impl.UserServiceImpl;
+import com.study.blog.util.LimitFlowLock;
 import com.study.blog.util.PasswordValidation;
 import com.study.blog.vo.ResultVO;
 import lombok.extern.slf4j.Slf4j;
@@ -81,7 +82,7 @@ public class UserSpaceController {
     @GetMapping("/{username}/profile")
     @ValidateAnnotation(authorityId = 2)
     @PreAuthorize("authentication.name.equals(#username)")
-    public ModelAndView profile(@PathVariable("username") String username, Model model,RedirectAttributes attributes) {
+    public ModelAndView profile(@PathVariable("username") String username, Model model, RedirectAttributes attributes) {
         User user = (User) userService.loadUserByUsername(username);
         log.info("【user 主页】：{}", user);
         Map<String, Objects> map = (Map<String, Objects>) attributes.getFlashAttributes();
@@ -215,7 +216,7 @@ public class UserSpaceController {
     @ValidateAnnotation(authorityId = 2)
     public String getBlogById(@PathVariable("username") String username, @PathVariable("id") Long id, Model
             model) {
-
+        long timeSum = System.currentTimeMillis();
         // 每次查询阅读量增加一次：较为简易
         blogService.readingIncrement(id);
         // cacheService.incrementBlogReading(id)
@@ -232,8 +233,7 @@ public class UserSpaceController {
                 isBlogOwner = true;
             }
         }
-
-        log.info("principal:{}", principal);
+        // log.info("principal:{}", principal)
         Long voteId;
         if (Objects.isNull(principal)) {
             voteId = 0L;
@@ -241,15 +241,21 @@ public class UserSpaceController {
             // 用户都已经认证过了！
             voteId = voteService.isVoted(id, principal.getId());
         }
-        log.info("voteId:{}", voteId);
+        // log.info("voteId:{}", voteId);
         // 将 是否为本人 判断结果返回给前端
+
+        // long time = System.currentTimeMillis();
         Blog blog = blogService.getBlogById(id);
-        log.info("blog:{}", blog);
+        // System.out.println("getBlog 总耗时：" + (System.currentTimeMillis() - time));
+
+        // log.info("blog:{}", blog);
         // 评论量、点赞量的设置：应该在 评论（点赞）有改动的时候设置
         model.addAttribute("isBlogOwner", isBlogOwner);
         model.addAttribute("blogModel", blog);
         model.addAttribute("blogEditor", userService.searchById(blog.getUserId()));
         model.addAttribute("voteId", voteId);
+        log.info("8/9 总耗时：{},{}", System.currentTimeMillis() - timeSum, Thread.currentThread().getId());
+        log.info("阻塞线程数：{}", LimitFlowLock.getSize(blog.getBlogId()));
         return "userspace/blog";
     }
 

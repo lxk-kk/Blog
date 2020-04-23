@@ -98,12 +98,15 @@ public class BlogController {
     }
 
     @GetMapping("/newest")
+    @Deprecated
     public String listNewestEsBlog(Model model) {
         List<EsBlog> newest = esBlogService.listTop5NewestEsBlog();
         model.addAttribute("newest", newest);
         return "newest";
     }
 
+    @GetMapping("/hotest")
+    @Deprecated
     public String listHotestEsBlog(Model model) {
         List<EsBlog> hotest = esBlogService.listTop5HotestEsBlog();
         model.addAttribute("hotest", hotest);

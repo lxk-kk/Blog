@@ -38,7 +38,7 @@ public class ValidateLoginAuthInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws
             Exception {
         // 新的登录认证还未完全重构完成，所以，现在就都放行：日后再开启！
-        if (Objects.equals(LET_GO, ValidateConstant.LET_GO_YES)) {
+        if (Objects.equals("yes", ValidateConstant.LET_GO_YES)) {
             return true;
         }
 

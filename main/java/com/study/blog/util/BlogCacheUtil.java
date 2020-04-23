@@ -8,7 +8,7 @@ import java.util.Objects;
  * @author 10652
  */
 @Slf4j
-public class BlogEvaluationUtil {
+public class BlogCacheUtil {
     public static String generateKey(Long id1, Long id2) {
         if (Objects.isNull(id1) || Objects.isNull(id2)) {
             // todo id为null 抛出异常

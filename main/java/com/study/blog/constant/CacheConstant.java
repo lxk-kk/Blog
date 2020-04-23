@@ -3,11 +3,16 @@ package com.study.blog.constant;
 /**
  * @author 10652
  */
-public class EvaluationConstant {
+public class CacheConstant {
     /**
      * 缓存名称
      */
-    public static final String BLOG_EVALUATION = "BLOG_EVALUATION";
+    public static final String BLOG = "BLOG";
+
+    /**
+     * 博客过期时长
+     */
+    public static final Integer BLOG_TIMEOUT = 6;
     /**
      * 评论
      */
