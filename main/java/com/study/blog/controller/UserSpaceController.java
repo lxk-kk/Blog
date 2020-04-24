@@ -9,7 +9,6 @@ import com.study.blog.service.BlogService;
 import com.study.blog.service.CatalogService;
 import com.study.blog.service.VoteService;
 import com.study.blog.service.impl.UserServiceImpl;
-import com.study.blog.util.LimitFlowLock;
 import com.study.blog.util.PasswordValidation;
 import com.study.blog.vo.ResultVO;
 import lombok.extern.slf4j.Slf4j;
@@ -254,8 +253,7 @@ public class UserSpaceController {
         model.addAttribute("blogModel", blog);
         model.addAttribute("blogEditor", userService.searchById(blog.getUserId()));
         model.addAttribute("voteId", voteId);
-        log.info("8/9 总耗时：{},{}", System.currentTimeMillis() - timeSum, Thread.currentThread().getId());
-        log.info("阻塞线程数：{}", LimitFlowLock.getSize(blog.getBlogId()));
+        log.info("8/9 总耗时：{},Blog：{}", System.currentTimeMillis() - timeSum, blog.getBlogId());
         return "userspace/blog";
     }
 

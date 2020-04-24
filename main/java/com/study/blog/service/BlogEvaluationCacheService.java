@@ -50,7 +50,7 @@ public interface BlogEvaluationCacheService {
      * @param blogId blogId
      * @return blog evaluation
      */
-    BlogEvaluationCacheDTO getBlogEvaluationByBlogId2Mysql(Long blogId);
+    BlogEvaluationCacheDTO getBlogEvaluationFromMysql(Long blogId);
 
     /**
      * 将 数据 更新入 数据库中 ： 定时更新入关系型数据库

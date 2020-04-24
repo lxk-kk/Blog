@@ -1,4 +1,4 @@
-package com.study.blog.repository;
+package com.study.blog.repository.es2search;
 
 import com.study.blog.entity.EsBlog;
 import org.springframework.data.domain.Page;

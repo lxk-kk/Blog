@@ -41,7 +41,7 @@ public class BlogCacheServiceImpl implements BlogCacheService {
         String key = BlogCacheUtil.generateKey(CacheConstant.BLOG, blogId);
         Object blogObj = redisTemplate.opsForValue().get(key);
         if (Objects.isNull(blogObj)) {
-            log.info("【查询 Blog 缓存】：博客 无缓存");
+            // log.info("【查询 Blog 缓存】：博客 无缓存");
             return null;
         }
         Blog blog;
@@ -61,6 +61,4 @@ public class BlogCacheServiceImpl implements BlogCacheService {
         String key = BlogCacheUtil.generateKey(CacheConstant.BLOG, blogId);
         redisTemplate.delete(key);
     }
-
-
 }

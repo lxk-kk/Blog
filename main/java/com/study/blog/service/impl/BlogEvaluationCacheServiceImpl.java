@@ -2,15 +2,20 @@ package com.study.blog.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.study.blog.constant.CacheConstant;
+import com.study.blog.constant.ConcurrencyFlowConstant;
+import com.study.blog.constant.ValidateConstant;
 import com.study.blog.dto.BlogEvaluationCacheDTO;
 import com.study.blog.entity.Comment;
 import com.study.blog.entity.Vote;
+import com.study.blog.exception.LimitFlowException;
 import com.study.blog.exception.NullBlogException;
+import com.study.blog.lock.LimitFlowLock;
 import com.study.blog.repository.BlogEvaluationRepository;
 import com.study.blog.service.BlogEvaluationCacheService;
 import com.study.blog.util.BlogCacheUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Lookup;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -31,13 +36,22 @@ import java.util.stream.Collectors;
 public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final BlogEvaluationRepository blogEvaluationRepository;
+    private final LimitFlowLock limitFlowLock;
 
 
     @Autowired
-    public BlogEvaluationCacheServiceImpl(RedisTemplate<String, Object> redisTemplate, BlogEvaluationRepository
-            blogEvaluationRepository) {
+    public BlogEvaluationCacheServiceImpl(RedisTemplate<String, Object> redisTemplate,
+                                          BlogEvaluationRepository blogEvaluationRepository) {
         this.redisTemplate = redisTemplate;
         this.blogEvaluationRepository = blogEvaluationRepository;
+        this.limitFlowLock = getLimitFlowLock();
+    }
+
+    @Lookup
+    private LimitFlowLock getLimitFlowLock() {
+        LimitFlowLock limitFlowLock = new LimitFlowLock();
+        log.info("【Lock_EVALUATION】:{}", limitFlowLock);
+        return limitFlowLock;
     }
 
     /**
@@ -48,29 +62,19 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      */
     @Override
     public Integer getReadingCountByBlogId(Long blogId) {
-        if (Objects.isNull(blogId)) {
-            // todo
-            log.error("【获取阅读量】 blogId 为空");
-        }
+        // 首先：空数据判断
+        judgeBlogInfoNull(blogId);
+
         Object object = redisTemplate.opsForHash().get(CacheConstant.READING_COUNT, blogId);
-        boolean judge = true;
-        if (Objects.isNull(object)) {
-            // 从数据库中获取
-            judge = false;
-        }
-        Integer readingCount = null;
-        if (judge) {
+        if (!Objects.isNull(object)) {
             try {
-                readingCount = JSONObject.parseObject(object.toString(), Integer.class);
+                return JSONObject.parseObject(object.toString(), Integer.class);
             } catch (Exception e) {
                 log.info("【获取阅读量】 json->Integer 转换失败");
-                judge = false;
             }
         }
-        if (judge) {
-            return readingCount;
-        }
-        return getBlogEvaluationByBlogId2Mysql(blogId).getReadingCount();
+        // 从数据库中刷新到缓存
+        return getBlogEvaluationFromMysql(blogId).getReadingCount();
     }
 
     /**
@@ -81,22 +85,19 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      */
     @Override
     public List<Comment> getBlogCommentListByBlogId(Long blogId) {
-        List<Comment> comments;
-        if (Objects.isNull(blogId)) {
-            // todo
-            log.error("【获取评论列表】 blogId 为空");
-        }
+        // 首先：空数据判断
+        judgeBlogInfoNull(blogId);
+
         String commentKey = BlogCacheUtil.generateKey(CacheConstant.COMMENT, blogId);
         List<Object> commentObj = redisTemplate.opsForHash().values(commentKey);
         try {
-            comments = commentObj.stream().map(
+            return commentObj.stream().map(
                     comment -> JSONObject.parseObject(comment.toString(), Comment.class)).collect(Collectors.toList()
             );
         } catch (Exception e) {
             log.info("【获取评论列表】 json->Comment 转换失败");
-            comments = getBlogEvaluationByBlogId2Mysql(blogId).getComments();
         }
-        return comments;
+        return getBlogEvaluationFromMysql(blogId).getComments();
     }
 
     /**
@@ -127,22 +128,91 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      */
     @Override
     public Vote getVotedByBlogId2VoteId(Long blogId, Long voteId) {
+        // 首先空数据检验
+        judgeBlogInfoNull(blogId);
+
         String voteKey = BlogCacheUtil.generateKey(CacheConstant.VOTE, blogId);
-        Boolean exist = redisTemplate.hasKey(voteKey);
-        Vote vote = null;
-        if (Objects.isNull(exist) || !exist) {
-            // 缓存中不存在：从 mysql 中获取
-            getBlogEvaluationByBlogId2Mysql(blogId);
-        }
-        try {
-            Object object = redisTemplate.opsForHash().get(voteKey, voteId);
-            if (!Objects.isNull(object)) {
-                vote = JSONObject.parseObject(object.toString(), Vote.class);
+        Boolean exist;
+        if (!Objects.isNull(exist = redisTemplate.hasKey(voteKey)) && exist) {
+            try {
+                Object object = redisTemplate.opsForHash().get(voteKey, voteId);
+                if (Objects.isNull(object)) {
+                    return null;
+                }
+                return JSONObject.parseObject(object.toString(), Vote.class);
+            } catch (Exception e) {
+                log.error("【获取 vote】 json -> Vote 类型转换异常:{}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.error("【获取 vote】 json -> Vote 类型转换异常:{}", e.getMessage());
         }
-        return vote;
+        // 从数据库刷新到缓存
+        List<Vote> votes = getBlogEvaluationFromMysql(blogId).getVotes();
+        for (Vote vote : votes) {
+            if (vote.getId().equals(voteId)) {
+                return vote;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 检测：请求的博客是否为 空数据
+     *
+     * @param blogId blogId
+     */
+    private void judgeBlogInfoNull(Long blogId) {
+        if (Objects.isNull(blogId)) {
+            // todo
+            log.error("参数为 null");
+            throw new NullBlogException(ValidateConstant.NULL_BLOG_INFO);
+        }
+        Boolean judge = redisTemplate.hasKey(blogId.toString());
+        if (!Objects.isNull(judge) && judge) {
+            redisTemplate.expire(blogId.toString(), CacheConstant.EXPIRE, TimeUnit.SECONDS);
+            throw new NullBlogException("Blog：" + blogId + " " + ValidateConstant.NULL_BLOG_INFO);
+        }
+    }
+
+    /**
+     * 检测是否缓存已存在
+     *
+     * @param blogId blogId
+     * @return dto
+     */
+    private BlogEvaluationCacheDTO judgeBlogNull(Long blogId) {
+        judgeBlogInfoNull(blogId);
+        return getBlogEvaluationByBlogId2Redis(blogId);
+    }
+
+    /**
+     * 从数据库中刷新缓存
+     *
+     * @param blogId blogId
+     * @return blogEvaluation
+     */
+    private BlogEvaluationCacheDTO flushCacheByMySQL(Long blogId) {
+        // 从数据库纵获取数据
+        BlogEvaluationCacheDTO blogEvaluation = blogEvaluationRepository.findByBlogId(blogId);
+        if (Objects.isNull(blogEvaluation)) {
+            // todo 防止 缓存穿透 处理
+            redisTemplate.opsForValue().set(String.valueOf(blogId), CacheConstant.NULL, CacheConstant.EXPIRE,
+                    TimeUnit.SECONDS);
+            throw new NullBlogException("Blog：" + blogId + " " + ValidateConstant.NULL_BLOG_INFO);
+        }
+        blogEvaluation.setBlogId(blogId);
+        // 从 mysql 中获取时使用的是 左连接 left join，所以 表之间关联时，comment以及vote表中可能没有数据，此时依旧会导出 null 值
+        if (Objects.isNull(blogEvaluation.getVoteCount()) || blogEvaluation.getVoteCount() == 0 ||
+                Objects.isNull(blogEvaluation.getVotes()) || blogEvaluation.getVotes().size() == 0) {
+            blogEvaluation.setVoteCount(0);
+            blogEvaluation.setVotes(new ArrayList<>(1));
+        }
+        if (Objects.isNull(blogEvaluation.getCommentCount()) || blogEvaluation.getCommentCount() == 0 ||
+                Objects.isNull(blogEvaluation.getComments()) || blogEvaluation.getComments().size() == 0) {
+            blogEvaluation.setCommentCount(0);
+            blogEvaluation.setComments(new ArrayList<>(1));
+        }
+        // 刷新到缓存
+        saveBlogEvaluation2Redis(blogId, blogEvaluation);
+        return blogEvaluation;
     }
 
     /**
@@ -152,74 +222,23 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * @return dto
      */
     @Override
-    public BlogEvaluationCacheDTO getBlogEvaluationByBlogId2Mysql(Long blogId) {
-        if (Objects.isNull(blogId)) {
-            // todo
-            log.error("【查询 数据库】 blogId 为空");
-            return null;
-        }
-        Boolean judge = redisTemplate.hasKey(blogId.toString());
-        if (!Objects.isNull(judge) && judge) {
-            throw new NullBlogException("blog 不存在！");
-        }
-        BlogEvaluationCacheDTO blogEvaluation = null;
-
-        // 考虑缓存并发问题【双重检测锁】：防止缓存中不存在，进而在短时间内向数据库发起大量请求，对数据库造成冲击！
-        /*
-        这一步已经在调用的方法中展现！
-        if (!Objects.isNull(blogEvaluation)) {
-            return blogEvaluation;
-        }
-        */
-        /*
-            若缓存不存在，则从数据库中获取数据的时候，进行加锁，锁内再次从redis获取进行判断，获取完数据后将数据存入 缓存！
-            加锁：只有一个进程能从数据库获取数据，其余进程只能在锁外等着（要不要换成分布式锁！）
-            再次从redis中尝试获取数据进行判断：后续进入if(!judge)了的线程不需要从数据库中获取了，可以直接从redis中获取！
-         */
-
-        log.info("【缓存穿透：查询mysql】 synchronized 锁外 thread ：{}", Thread.currentThread().getId());
-
-        synchronized (this) {
-            // 注意：synchronized(this)：表示锁代码块，作用对象为执行该方法的对象，不同对象之间互不影响
-            // 由于 这是在 service 中，业务领域对象 service 为单例，所以，所有请求，所有客户端请求，都会通过该方法执行此代码块：所以有用！
-            // 由于 此处 blogEvaluation 对象是局部变量，不受多线程的影响，所以每个线程的 blogEvaluation是不同的，是线程安全的！
-
-            log.info("【缓存穿透：查询mysql】锁内 thread ：{}", Thread.currentThread().getId());
-
-            // 排除线程已经进入方法块，但是缓存已经存在的情况
-            if (Objects.isNull(blogEvaluation = getBlogEvaluationByBlogId2Redis(blogId))) {
-                // 以下单进程访问！
-
-                log.info("【缓存穿透：查询mysql】 单进程 thread ：{}", Thread.currentThread().getId());
-
-                // 从数据库中获取 blog evaluation
-                blogEvaluation = blogEvaluationRepository.findByBlogId(blogId);
-                if (Objects.isNull(blogEvaluation)) {
-                    // todo 防止 缓存穿透 处理
-                    log.error("【获取 blog 信息】id 为 {} 的 blog 不存在！", blogId);
-                    redisTemplate.opsForValue().set(Long.toString(blogId), CacheConstant.NULL,
-                            CacheConstant.EXPIRE, TimeUnit.SECONDS);
-                    throw new NullBlogException("blog 不存在！");
-
-                }
-                blogEvaluation.setBlogId(blogId);
-
-                // 从 mysql 中获取时使用的是 左连接 left join，所以 表之间关联时，comment以及vote表中可能没有数据，此时依旧会导出 null 值
-                if (Objects.isNull(blogEvaluation.getVoteCount()) || blogEvaluation.getVoteCount() == 0 ||
-                        Objects.isNull(blogEvaluation.getVotes()) || blogEvaluation.getVotes().size() == 0) {
-                    blogEvaluation.setVoteCount(0);
-                    blogEvaluation.setVotes(new ArrayList<>(1));
-                }
-                if (Objects.isNull(blogEvaluation.getCommentCount()) || blogEvaluation.getCommentCount() == 0 ||
-                        Objects.isNull(blogEvaluation.getComments()) || blogEvaluation.getComments().size() == 0) {
-                    blogEvaluation.setCommentCount(0);
-                    blogEvaluation.setComments(new ArrayList<>(1));
-                }
-                // 存入 redis 缓存
-                saveBlogEvaluation2Redis(blogId, blogEvaluation);
+    public BlogEvaluationCacheDTO getBlogEvaluationFromMysql(Long blogId) {
+        BlogEvaluationCacheDTO blogEvaluationCache;
+        if (limitFlowLock.limitRequestPass(blogId, () -> Objects.isNull(judgeBlogNull(blogId)), false)) {
+            try {
+                blogEvaluationCache = flushCacheByMySQL(blogId);
+            } finally {
+                // 保证锁被释放
+                limitFlowLock.releasePermission(blogId);
             }
-            return blogEvaluation;
+        } else {
+            // 这部分线程 是被阻塞后，被唤醒的
+            blogEvaluationCache = judgeBlogNull(blogId);
+            if (Objects.isNull(blogEvaluationCache)) {
+                throw new LimitFlowException("Blog:" + blogId + " " + ConcurrencyFlowConstant.SYSTEM_BUSY_MSG);
+            }
         }
+        return blogEvaluationCache;
     }
 
     /**
@@ -315,10 +334,10 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
             return null;
         }
         try {
-                /*
-                从 redis 中获取的数据，需要经过 JSONObject 转换
-                否则报错：com.alibaba.fastjson.JSONObject cannot be cast to com.study.blog.dto.BlogEvaluationCacheDTO
-                 */
+            /*
+            从 redis 中获取的数据，需要经过 JSONObject 转换
+            否则报错：com.alibaba.fastjson.JSONObject cannot be cast to com.study.blog.dto.BlogEvaluationCacheDTO
+             */
             blogEvaluation.setReadingCount(JSONObject.parseObject(readCountObj.toString(), Integer.class));
             blogEvaluation.setCommentCount(JSONObject.parseObject(commentCountObj.toString(), Integer.class));
             blogEvaluation.setVoteCount(JSONObject.parseObject(voteCountObj.toString(), Integer.class));
@@ -427,13 +446,15 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      */
     @Override
     public Long incrementBlogReading(Long blogId) {
+        // 首先：空数据判断
+        judgeBlogInfoNull(blogId);
+
         // 判断键值是否存在
         if (!redisTemplate.opsForHash().hasKey(CacheConstant.READING_COUNT, blogId)) {
-            // 不存在则从数据库中获取
-            getBlogEvaluationByBlogId2Mysql(blogId);
+            // 从数据库刷新到 缓存(如果查询结果为 null，会抛出异常)
+            getBlogEvaluationFromMysql(blogId);
         }
         return redisTemplate.opsForHash().increment(CacheConstant.READING_COUNT, blogId, 1L);
-
     }
 
     /**
@@ -443,6 +464,9 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      */
     @Override
     public void deleteBlogEvaluation(Long blogId) {
+        // 首先：判断是否空数据
+        judgeBlogInfoNull(blogId);
+
         redisTemplate.opsForHash().delete(CacheConstant.READING_COUNT, blogId);
         redisTemplate.opsForHash().delete(CacheConstant.COMMENT_COUNT, blogId);
         redisTemplate.opsForHash().delete(CacheConstant.VOTE_COUNT, blogId);
