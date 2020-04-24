@@ -89,12 +89,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     /**
-     * 事务场景中，抛出异常被catch后，如果需要回滚则一定要手动回滚！
-     * 需要在Transactional注解中指定rollbackFor回滚，或是在方法中显示使用rollback回滚
-     *
      * @param user 用户
      */
-    @Transactional(rollbackFor = Throwable.class)
     @Override
     public void updateUser(User user) {
         userMapper.updateUser(user);

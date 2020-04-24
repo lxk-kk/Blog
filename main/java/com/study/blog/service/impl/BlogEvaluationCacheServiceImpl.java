@@ -1,14 +1,14 @@
 package com.study.blog.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.study.blog.constant.EvaluationConstant;
+import com.study.blog.constant.CacheConstant;
 import com.study.blog.dto.BlogEvaluationCacheDTO;
 import com.study.blog.entity.Comment;
 import com.study.blog.entity.Vote;
 import com.study.blog.exception.NullBlogException;
 import com.study.blog.repository.BlogEvaluationRepository;
 import com.study.blog.service.BlogEvaluationCacheService;
-import com.study.blog.util.BlogEvaluationUtil;
+import com.study.blog.util.BlogCacheUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -52,7 +52,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
             // todo
             log.error("【获取阅读量】 blogId 为空");
         }
-        Object object = redisTemplate.opsForHash().get(EvaluationConstant.READING_COUNT, blogId);
+        Object object = redisTemplate.opsForHash().get(CacheConstant.READING_COUNT, blogId);
         boolean judge = true;
         if (Objects.isNull(object)) {
             // 从数据库中获取
@@ -86,7 +86,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
             // todo
             log.error("【获取评论列表】 blogId 为空");
         }
-        String commentKey = BlogEvaluationUtil.generateKey(EvaluationConstant.COMMENT, blogId);
+        String commentKey = BlogCacheUtil.generateKey(CacheConstant.COMMENT, blogId);
         List<Object> commentObj = redisTemplate.opsForHash().values(commentKey);
         try {
             comments = commentObj.stream().map(
@@ -108,8 +108,8 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      */
     @Override
     public Long judgeVotedById(Long blogId, Integer userId) {
-        String voteKey = BlogEvaluationUtil.generateKey(EvaluationConstant.VOTE, blogId);
-        String userKey = BlogEvaluationUtil.generateKey(EvaluationConstant.USER_ID, userId);
+        String voteKey = BlogCacheUtil.generateKey(CacheConstant.VOTE, blogId);
+        String userKey = BlogCacheUtil.generateKey(CacheConstant.USER_ID, userId);
         DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
         redisScript.setLocation(new ClassPathResource("lua/judgevoted.lua"));
         redisScript.setResultType(Long.class);
@@ -127,7 +127,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      */
     @Override
     public Vote getVotedByBlogId2VoteId(Long blogId, Long voteId) {
-        String voteKey = BlogEvaluationUtil.generateKey(EvaluationConstant.VOTE, blogId);
+        String voteKey = BlogCacheUtil.generateKey(CacheConstant.VOTE, blogId);
         Boolean exist = redisTemplate.hasKey(voteKey);
         Vote vote = null;
         if (Objects.isNull(exist) || !exist) {
@@ -197,8 +197,8 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
                 if (Objects.isNull(blogEvaluation)) {
                     // todo 防止 缓存穿透 处理
                     log.error("【获取 blog 信息】id 为 {} 的 blog 不存在！", blogId);
-                    redisTemplate.opsForValue().set(Long.toString(blogId), EvaluationConstant.NULL,
-                            EvaluationConstant.EXPIRE, TimeUnit.SECONDS);
+                    redisTemplate.opsForValue().set(Long.toString(blogId), CacheConstant.NULL,
+                            CacheConstant.EXPIRE, TimeUnit.SECONDS);
                     throw new NullBlogException("blog 不存在！");
 
                 }
@@ -227,15 +227,14 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * 只更新 readingCount、commentCount、voteCount
      */
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public void saveBlogEvaluation2Mysql() {
         // readCount
-        Cursor<Map.Entry<Object, Object>> cursor = redisTemplate.opsForHash().scan(EvaluationConstant.READING_COUNT,
+        Cursor<Map.Entry<Object, Object>> cursor = redisTemplate.opsForHash().scan(CacheConstant.READING_COUNT,
                 ScanOptions.NONE);
         Map<Long, Long> readCountMap = new HashMap<>(1);
         Long blogId;
         Long readCount = null;
-        Map.Entry entry;
+        Map.Entry<Object, Object> entry;
         while (cursor.hasNext()) {
             entry = cursor.next();
             try {
@@ -248,7 +247,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
             }
         }
         // commentCount
-        cursor = redisTemplate.opsForHash().scan(EvaluationConstant.COMMENT_COUNT, ScanOptions.NONE);
+        cursor = redisTemplate.opsForHash().scan(CacheConstant.COMMENT_COUNT, ScanOptions.NONE);
         Map<Long, Long> commentCountMap = new HashMap<>(1);
         Long commentCount;
         while (cursor.hasNext()) {
@@ -263,7 +262,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
             }
         }
         // voteCount
-        cursor = redisTemplate.opsForHash().scan(EvaluationConstant.VOTE_COUNT, ScanOptions.NONE);
+        cursor = redisTemplate.opsForHash().scan(CacheConstant.VOTE_COUNT, ScanOptions.NONE);
         Map<Long, Long> voteCountMap = new HashMap<>(1);
         Long voteCount;
         while (cursor.hasNext()) {
@@ -277,6 +276,20 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
                 log.error("【 voteCount ：redis -> mysql 】类型转换异常:{}", e.getMessage());
             }
         }
+        // 单独抽离出去加事务，防止耗时的操作占用事务，导致 SQL 连接被耗尽
+        saveBlogEvaluation(readCountMap, commentCountMap, voteCountMap);
+    }
+
+    /**
+     * 单独抽离出来添加事务：避免和 耗时的操作混合在一起，导致 SQL 连接被耗尽
+     *
+     * @param readCountMap    阅读量 模块
+     * @param commentCountMap 评论量 模块
+     * @param voteCountMap    点赞量 模块
+     */
+    @Transactional(rollbackFor = Throwable.class)
+    void saveBlogEvaluation(Map<Long, Long> readCountMap, Map<Long, Long> commentCountMap, Map<Long, Long>
+            voteCountMap) {
         if (readCountMap.size() > 0 || commentCountMap.size() > 0 || voteCountMap.size() > 0) {
             log.info("readCount:{}  |  commentCount:{}   |   voteCount:{}", readCountMap, commentCountMap,
                     voteCountMap);
@@ -294,11 +307,9 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
     @Override
     public BlogEvaluationCacheDTO getBlogEvaluationByBlogId2Redis(Long blogId) {
         BlogEvaluationCacheDTO blogEvaluation = new BlogEvaluationCacheDTO();
-        Object readCountObj = redisTemplate.opsForHash().get(EvaluationConstant.READING_COUNT, blogId);
-        Object commentCountObj = redisTemplate.opsForHash().get(EvaluationConstant.COMMENT_COUNT, blogId);
-        Object voteCountObj = redisTemplate.opsForHash().get(EvaluationConstant.VOTE_COUNT, blogId);
-
-        log.info("【查询缓存】");
+        Object readCountObj = redisTemplate.opsForHash().get(CacheConstant.READING_COUNT, blogId);
+        Object commentCountObj = redisTemplate.opsForHash().get(CacheConstant.COMMENT_COUNT, blogId);
+        Object voteCountObj = redisTemplate.opsForHash().get(CacheConstant.VOTE_COUNT, blogId);
         if (Objects.isNull(readCountObj) || Objects.isNull(commentCountObj) || Objects.isNull(voteCountObj)) {
             log.info("【缓存】blog:{} 无缓存", blogId);
             return null;
@@ -312,7 +323,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
             blogEvaluation.setCommentCount(JSONObject.parseObject(commentCountObj.toString(), Integer.class));
             blogEvaluation.setVoteCount(JSONObject.parseObject(voteCountObj.toString(), Integer.class));
         } catch (Exception e) {
-            log.error("【缓存】blog:{} json 转换异常", blogId, e.getMessage());
+            log.error("【缓存】blog:{} Json 转换异常", blogId, e.getMessage());
             return null;
         }
         return blogEvaluation;
@@ -325,17 +336,16 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * @param blogEvaluation blog evaluation
      */
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public void saveBlogEvaluation2Redis(Long blogId, BlogEvaluationCacheDTO blogEvaluation) {
-        redisTemplate.opsForHash().put(EvaluationConstant.READING_COUNT, blogId, blogEvaluation.getReadingCount());
-        redisTemplate.opsForHash().put(EvaluationConstant.COMMENT_COUNT, blogId, blogEvaluation.getCommentCount());
-        redisTemplate.opsForHash().put(EvaluationConstant.VOTE_COUNT, blogId, blogEvaluation.getVoteCount());
+        redisTemplate.opsForHash().put(CacheConstant.READING_COUNT, blogId, blogEvaluation.getReadingCount());
+        redisTemplate.opsForHash().put(CacheConstant.COMMENT_COUNT, blogId, blogEvaluation.getCommentCount());
+        redisTemplate.opsForHash().put(CacheConstant.VOTE_COUNT, blogId, blogEvaluation.getVoteCount());
         blogEvaluation.getComments().forEach(comment -> {
-            String commentKey = BlogEvaluationUtil.generateKey(EvaluationConstant.COMMENT, blogId);
+            String commentKey = BlogCacheUtil.generateKey(CacheConstant.COMMENT, blogId);
             redisTemplate.opsForHash().put(commentKey, comment.getId(), comment);
         });
         blogEvaluation.getVotes().forEach(vote -> {
-            String voteKey = BlogEvaluationUtil.generateKey(EvaluationConstant.VOTE, blogId);
+            String voteKey = BlogCacheUtil.generateKey(CacheConstant.VOTE, blogId);
             redisTemplate.opsForHash().put(voteKey, vote.getId(), vote);
         });
     }
@@ -346,17 +356,16 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * @param comment comment
      */
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public Long addBlogComment(Comment comment) {
         Long blogId = comment.getBlogId();
 
         // 插入到 mysql 中获取 commentId
         blogEvaluationRepository.insertComment(comment);
         // 直接 put 到 redis ：不会涉及到旧的状态，没有并发问题！
-        String commentKey = BlogEvaluationUtil.generateKey(EvaluationConstant.COMMENT, blogId);
+        String commentKey = BlogCacheUtil.generateKey(CacheConstant.COMMENT, blogId);
         redisTemplate.opsForHash().put(commentKey, comment.getId(), comment);
         // 评论量+1：redis单线程操作，不会出现并发问题！
-        return redisTemplate.opsForHash().increment(EvaluationConstant.COMMENT_COUNT, blogId, 1L);
+        return redisTemplate.opsForHash().increment(CacheConstant.COMMENT_COUNT, blogId, 1L);
     }
 
     /**
@@ -366,15 +375,14 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * @param commentId commentId
      */
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public Long deleteBlogComment(Long blogId, Long commentId) {
         // redis 删除评论！
-        String commentKey = BlogEvaluationUtil.generateKey(EvaluationConstant.COMMENT, blogId);
+        String commentKey = BlogCacheUtil.generateKey(CacheConstant.COMMENT, blogId);
         redisTemplate.opsForHash().delete(commentKey, commentId);
         // 删除 mysql 中的记录
         blogEvaluationRepository.deleteCommentByCommentId(commentId);
         // 评论量 -1
-        return redisTemplate.opsForHash().increment(EvaluationConstant.COMMENT_COUNT, blogId, -1L);
+        return redisTemplate.opsForHash().increment(CacheConstant.COMMENT_COUNT, blogId, -1L);
     }
 
     /**
@@ -383,16 +391,15 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * @param vote vote
      */
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public Long voteBlog(Vote vote) {
         Long blogId = vote.getBlogId();
         // 获取 voteId
         blogEvaluationRepository.insertVote(vote);
         // redis 新增vote
-        String voteKey = BlogEvaluationUtil.generateKey(EvaluationConstant.VOTE, blogId);
+        String voteKey = BlogCacheUtil.generateKey(CacheConstant.VOTE, blogId);
         redisTemplate.opsForHash().put(voteKey, vote.getId(), vote);
         // 修改 voteCount 并返回
-        return redisTemplate.opsForHash().increment(EvaluationConstant.VOTE_COUNT, blogId, 1L);
+        return redisTemplate.opsForHash().increment(CacheConstant.VOTE_COUNT, blogId, 1L);
     }
 
     /**
@@ -402,15 +409,14 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * @param voteId voteId
      */
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public Long cancelVotedBlog(Long blogId, Long voteId) {
         // 删除 redis 中的 vote 记录
-        String voteKey = BlogEvaluationUtil.generateKey(EvaluationConstant.VOTE, blogId);
+        String voteKey = BlogCacheUtil.generateKey(CacheConstant.VOTE, blogId);
         redisTemplate.opsForHash().delete(voteKey, voteId);
         // 删除 mysql 中的记录
         blogEvaluationRepository.deleteVoteByVoteId(voteId);
         // 点赞量更新 -1
-        return redisTemplate.opsForHash().increment(EvaluationConstant.VOTE_COUNT, blogId, -1L);
+        return redisTemplate.opsForHash().increment(CacheConstant.VOTE_COUNT, blogId, -1L);
     }
 
     /**
@@ -420,16 +426,13 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * @return 阅读量
      */
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public Long incrementBlogReading(Long blogId) {
         // 判断键值是否存在
-        if (!redisTemplate.opsForHash().hasKey(EvaluationConstant.READING_COUNT, blogId)) {
+        if (!redisTemplate.opsForHash().hasKey(CacheConstant.READING_COUNT, blogId)) {
             // 不存在则从数据库中获取
             getBlogEvaluationByBlogId2Mysql(blogId);
-        } else {
-            log.info("【reading increment 缓存中存在】thread ：{}", Thread.currentThread().getId());
         }
-        return redisTemplate.opsForHash().increment(EvaluationConstant.READING_COUNT, blogId, 1L);
+        return redisTemplate.opsForHash().increment(CacheConstant.READING_COUNT, blogId, 1L);
 
     }
 
@@ -439,13 +442,12 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      * @param blogId blogId
      */
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public void deleteBlogEvaluation(Long blogId) {
-        redisTemplate.opsForHash().delete(EvaluationConstant.READING_COUNT, blogId);
-        redisTemplate.opsForHash().delete(EvaluationConstant.COMMENT_COUNT, blogId);
-        redisTemplate.opsForHash().delete(EvaluationConstant.VOTE_COUNT, blogId);
-        String commentKey = BlogEvaluationUtil.generateKey(EvaluationConstant.COMMENT, blogId);
-        String voteKey = BlogEvaluationUtil.generateKey(EvaluationConstant.VOTE, blogId);
+        redisTemplate.opsForHash().delete(CacheConstant.READING_COUNT, blogId);
+        redisTemplate.opsForHash().delete(CacheConstant.COMMENT_COUNT, blogId);
+        redisTemplate.opsForHash().delete(CacheConstant.VOTE_COUNT, blogId);
+        String commentKey = BlogCacheUtil.generateKey(CacheConstant.COMMENT, blogId);
+        String voteKey = BlogCacheUtil.generateKey(CacheConstant.VOTE, blogId);
         redisTemplate.delete(commentKey);
         redisTemplate.delete(voteKey);
     }

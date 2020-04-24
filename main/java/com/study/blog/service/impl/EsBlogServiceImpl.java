@@ -2,7 +2,7 @@ package com.study.blog.service.impl;
 
 import com.study.blog.entity.EsBlog;
 import com.study.blog.entity.User;
-import com.study.blog.repository.EsBlogRepository;
+import com.study.blog.repository.es2search.EsBlogRepository;
 import com.study.blog.service.EsBlogService;
 import com.study.blog.service.UserService;
 import com.study.blog.vo.TagVO;
@@ -195,7 +195,7 @@ public class EsBlogServiceImpl implements EsBlogService {
                         order(BucketOrder.count(false)).size(30)
                         而不是 order(Terms.Order.count(false)).size(30)
                     */
-                        AggregationBuilders.terms("tags").field("tags").order(BucketOrder.count(false)).size(30)
+                        AggregationBuilders.terms("tags").field("tags").order(BucketOrder.count(false)).size(30).shardSize(40)
                 ).build();
 
         // 2、执行上述查询条件，得到聚合结果

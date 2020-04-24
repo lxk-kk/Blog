@@ -1,21 +1,24 @@
 package com.study.blog.service.impl;
 
 import com.github.pagehelper.Page;
-import com.study.blog.constant.EvaluationConstant;
+import com.study.blog.constant.CacheConstant;
+import com.study.blog.constant.ConcurrencyFlowConstant;
 import com.study.blog.dto.BlogEvaluationCacheDTO;
 import com.study.blog.entity.Blog;
 import com.study.blog.entity.EsBlog;
 import com.study.blog.entity.User;
+import com.study.blog.exception.LimitFlowException;
 import com.study.blog.exception.NullBlogException;
 import com.study.blog.repository.BlogRepository;
-import com.study.blog.repository.EsBlogRepository;
+import com.study.blog.repository.es2search.EsBlogRepository;
+import com.study.blog.service.BlogCacheService;
 import com.study.blog.service.BlogEvaluationCacheService;
 import com.study.blog.service.BlogService;
+import com.study.blog.util.LimitFlowLock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -31,34 +34,88 @@ public class BlogServiceImpl implements BlogService {
     private final EsBlogRepository esBlogRepository;
     private final BlogEvaluationCacheService cacheService;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final BlogCacheService blogCacheService;
 
     @Autowired
     public BlogServiceImpl(BlogRepository blogRepository, EsBlogRepository esBlogRepository,
-                           BlogEvaluationCacheService cacheService, RedisTemplate<String, Object> redisTemplate) {
+                           BlogEvaluationCacheService cacheService, RedisTemplate<String, Object> redisTemplate,
+                           BlogCacheService blogCacheService) {
         this.blogRepository = blogRepository;
         this.esBlogRepository = esBlogRepository;
         this.cacheService = cacheService;
         this.redisTemplate = redisTemplate;
+        this.blogCacheService = blogCacheService;
     }
 
     @Override
-    public Blog getBlogById(Long id) {
-        Boolean judge = redisTemplate.hasKey(id.toString());
+    public Blog getBlogById(Long blogId) {
+        Blog blog;
+        // 尝试从缓存中获取博客，如果是空数据，则会抛出异常！
+        if (Objects.isNull(blog = judgeBlogNull(blogId))) {
+            // 限流
+            if (LimitFlowLock.limitRequestPass(blogId, () -> Objects.isNull(judgeBlogNull(blogId)))) {
+                try {
+                    blog = flushCacheByMySQL(blogId);
+                } finally {
+                    // 保证获取许可证的线程 释放许可证！
+                    LimitFlowLock.releasePermission(blogId);
+                }
+            } else {
+                // 这部分线程是被限流被唤醒的!
+
+                // 尝试从缓存中获取博客，如果是空数据，则会抛出异常，不再继续往下执行！
+                blog = judgeBlogNull(blogId);
+                if (Objects.isNull(blog)) {
+                    // 如果被阻塞后还是为 null，说明现在请求资源的线程数太多了，返回系统正忙！
+                    throw new LimitFlowException(ConcurrencyFlowConstant.SYSTEM_BUSY_MSG);
+                }
+            }
+        }
+        // 使用 缓存中的指标量展示博客
+        blogCacheEvaluation(blog);
+        return blog;
+    }
+
+    /**
+     * 检查是否是空数据，如果是，则直接抛出异常，如果不是，则继续执行
+     *
+     * @param blogId blogId
+     */
+    private Blog judgeBlogNull(Long blogId) {
+        // long time = System.currentTimeMillis();
+        Boolean judge = redisTemplate.hasKey(blogId.toString());
+        // 检查是否是 空 数据！
         if (!Objects.isNull(judge) && judge) {
             // 说明 该blog 不存在！
             throw new NullBlogException("blog 不存在！");
         }
+        // 尝试从缓存中查询
+        // System.out.println("judgeBlogNull：2：" + (currentTimeMillis() - time));
+        return blogCacheService.getBlogFromCacheById(blogId);
+    }
 
-        Blog blog = blogRepository.getBlogById(id);
+    /**
+     * 从 数据库 中刷新数据到 缓存
+     *
+     * @param blogId blogId
+     * @return blog
+     */
+    private Blog flushCacheByMySQL(Long blogId) {
+        // 从 数据库中获取
+        // long time = System.currentTimeMillis();
+        Blog blog = blogRepository.getBlogById(blogId);
+        // System.out.println("flushCacheByMySQL：mysql：" + (System.currentTimeMillis() - time));
         if (Objects.isNull(blog)) {
-            // todo 防止 缓存穿透 处理
-            log.error("【获取 blog 信息】id 为 {} 的 blog 不存在！", id);
-            redisTemplate.opsForValue().set(Long.toString(id), EvaluationConstant.NULL,
-                    EvaluationConstant.EXPIRE, TimeUnit.SECONDS);
+            // 说明数据库中也不存在，防止 缓存穿透 处理
+            log.error("【获取 博客】blogId 为 {} 的 blog 不存在！", blogId);
+            redisTemplate.opsForValue().set(String.valueOf(blogId), CacheConstant.NULL, CacheConstant.EXPIRE,
+                    TimeUnit.SECONDS);
             throw new NullBlogException("blog 不存在！");
-
         }
-        blogCacheEvaluation(blog);
+        // 使缓存生效
+        // time = System.currentTimeMillis();
+        blogCacheService.putBlogCache(blog);
+        // System.out.println("flushCacheByMySQL 缓存生效：1：" + (System.currentTimeMillis() - time));
         return blog;
     }
 
@@ -68,7 +125,6 @@ public class BlogServiceImpl implements BlogService {
      * @param blog 博客
      * @return blog
      */
-    @Transactional(rollbackFor = Throwable.class)
     @Override
     public Blog saveBlog(Blog blog, User user) {
         // 必须先新增到关系型数据库中，使得博客id回传
@@ -89,12 +145,14 @@ public class BlogServiceImpl implements BlogService {
      * @param user 博主
      * @return 博客
      */
-    @Transactional(rollbackFor = Throwable.class)
     @Override
     public Blog updateBlog(Blog blog, User user) {
+        // 先删除缓存，再更新数据库
+        blogCacheService.removeBlogFromCacheById(blog.getBlogId());
         blogRepository.updateBlog(blog);
         // todo
         blog.setCreateTime(blogRepository.getCreateTime(blog.getBlogId()));
+        // 更新 ES
         updateEsBlog(blog, user);
         return blog;
     }
@@ -104,15 +162,17 @@ public class BlogServiceImpl implements BlogService {
      *
      * @param blogId blog id
      */
-    @Transactional(rollbackFor = Throwable.class)
     @Override
     public void removeBlog(Long blogId) {
+        // 删除博客缓存
+        blogCacheService.removeBlogFromCacheById(blogId);
+        // 删除博客相关指标量
         cacheService.deleteBlogEvaluation(blogId);
+        // 数据库删除缓存
         blogRepository.removeBlog(blogId);
-        // 同时删除 ES 中的博客记录
+        // 删除 ES 中的博客记录
         EsBlog esBlog = esBlogRepository.findByBlogId(blogId);
         esBlogRepository.deleteById(esBlog.getId());
-        // 同时删除缓存中的记录
     }
 
     /**
@@ -120,14 +180,18 @@ public class BlogServiceImpl implements BlogService {
      *
      * @param id 博客id
      */
-    @Transactional(rollbackFor = Throwable.class)
     @Override
     public void readingIncrement(Long id) {
         // blogRepository.readingIncrement(id)
+        // Long time = currentTimeMillis();
         Long count = cacheService.incrementBlogReading(id);
+        // System.out.println("阅读量：2：" + (currentTimeMillis() - time));
+
         count = Objects.isNull(count) ? 0L : count;
         Integer readCount = Math.toIntExact(count);
+        // time = currentTimeMillis();
         updateEsBlog(id, readCount);
+        // System.out.println("本地 ES：2：" + (currentTimeMillis() - time));
     }
 
     /**
@@ -141,11 +205,13 @@ public class BlogServiceImpl implements BlogService {
         try {
             esBlog = esBlogRepository.findByBlogId(blog.getBlogId());
         } catch (Exception e) {
-            log.error("【保存更新 ES】：{}", e.getMessage());
+            log.error("【ES】查询异常：{}", e.getMessage());
+            // todo 抛出异常
             return;
         }
         if (esBlog == null) {
-            log.error("【保存更新 ES】更新博客 ： EsBlog 检索为NULL ");
+            // log.error("【ES】不存在 Blog:{}", blog.getBlogId());
+            // todo 抛出异常
             return;
         }
         esBlog.update(blog, user);
@@ -162,11 +228,11 @@ public class BlogServiceImpl implements BlogService {
         try {
             esBlog = esBlogRepository.findByBlogId(blogId);
         } catch (Exception e) {
-            log.error("【保存更新 ES】阅读量 ：{}", e.getMessage());
+            log.error("【ES】阅读量 ：{}", e.getMessage());
             return;
         }
         if (esBlog == null) {
-            log.error("【保存更新 ES】阅读量 ：EsBlog 检索为NULL");
+            // log.error("【ES】不存在 blog:{}", blogId);
             return;
         }
        /*
@@ -217,8 +283,7 @@ public class BlogServiceImpl implements BlogService {
         if (title != null) {
             title = "%" + title + "%";
         }
-        Page<Blog> blogPage = blogRepository.findByUserAndTitleLike(userId, title, startPage, pageSize);
-        return blogPage;
+        return blogRepository.findByUserAndTitleLike(userId, title, startPage, pageSize);
     }
 
     /**
@@ -231,19 +296,20 @@ public class BlogServiceImpl implements BlogService {
      */
     @Override
     public Page<Blog> listBlogByCatalog(Long catalogId, int pageNum, int pageSize) {
-        Page<Blog> blogPage = blogRepository.findByCatalog(catalogId, pageNum, pageSize);
-        return blogPage;
+        return blogRepository.findByCatalog(catalogId, pageNum, pageSize);
     }
 
     /**
-     * 用缓存中的信息更新 mysql 中的信息
+     * 使用缓存中的 指标量 展示博客
      *
      * @param blog blog
      */
     private void blogCacheEvaluation(Blog blog) {
         // 从缓存中获取 阅读量、点赞量、评论量
         // 先查询 缓存
+        // Long time = System.currentTimeMillis();
         BlogEvaluationCacheDTO cacheDTO = cacheService.getBlogEvaluationByBlogId2Redis(blog.getBlogId());
+        // System.out.println("blogCacheEvaluation：3：" + (System.currentTimeMillis() - time));
         if (Objects.isNull(cacheDTO)) {
             // 缓存中不存在：查询mysql
             try {

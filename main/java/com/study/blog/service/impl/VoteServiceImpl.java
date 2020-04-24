@@ -3,14 +3,13 @@ package com.study.blog.service.impl;
 import com.study.blog.entity.EsBlog;
 import com.study.blog.entity.User;
 import com.study.blog.entity.Vote;
-import com.study.blog.repository.EsBlogRepository;
+import com.study.blog.repository.es2search.EsBlogRepository;
 import com.study.blog.service.BlogEvaluationCacheService;
 import com.study.blog.service.VoteService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
@@ -67,12 +66,13 @@ public class VoteServiceImpl implements VoteService {
         Integer isVoted = repository.isVoted(new Vote(blogId, userId))
         return Objects.isNull(isVoted) ? 0 : isVoted;
         */
+        Long time = System.currentTimeMillis();
         Long longv = cacheService.judgeVotedById(blogId, userId);
-        log.info("longv:{}", longv);
+        System.out.println("点赞判断：1：" + (System.currentTimeMillis() - time));
+        // log.info("longv:{}", longv)
         return longv;
     }
 
-    @Transactional(rollbackFor = Throwable.class)
     @Override
     public void voteBlog(Long blogId) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -96,7 +96,6 @@ public class VoteServiceImpl implements VoteService {
         updateEsBlog(blogId, voteCount);
     }
 
-    @Transactional(rollbackFor = Throwable.class)
     @Override
     public void deleteVote(Long voteId, Long blogId) {
         // 这里就不需要判断一下是否点过赞吗？

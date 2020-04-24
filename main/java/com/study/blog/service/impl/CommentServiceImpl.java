@@ -2,13 +2,12 @@ package com.study.blog.service.impl;
 
 import com.study.blog.entity.Comment;
 import com.study.blog.entity.EsBlog;
-import com.study.blog.repository.EsBlogRepository;
+import com.study.blog.repository.es2search.EsBlogRepository;
 import com.study.blog.service.BlogEvaluationCacheService;
 import com.study.blog.service.CommentService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -35,7 +34,6 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public void publishComment(String content, Integer userId, Long blogId) {
         /*
         commentRepository.insertComment(new Comment(userId, content, blogId))
@@ -46,7 +44,6 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
-    @Transactional(rollbackFor = Throwable.class)
     public void removeComment(Long id, Long blogId) {
         /*
         commentRepository.deleteComment(id)
