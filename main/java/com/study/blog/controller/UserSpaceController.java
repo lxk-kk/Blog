@@ -110,7 +110,7 @@ public class UserSpaceController {
             attributes.addFlashAttribute("msg", result.getFieldError().getDefaultMessage());
             return "redirect:/u/" + username + "/profile";
         }
-        User origin = userService.findOneByUsername(username);
+        User origin = userService.searchByUsername(username);
         origin.setEmail(user.getEmail());
         // 验证密码是否被修改过，如果被修改过则需要对其进行加密保存
         if (!PasswordValidation.equalPassword(origin.getPassword(), user.getPassword())) {
@@ -131,7 +131,7 @@ public class UserSpaceController {
     @PreAuthorize("authentication.name.equals(#username)")
     @ValidateAnnotation(authorityId = 2)
     public ModelAndView avatar(@PathVariable("username") String username, Model model) {
-        User user = userService.findOneByUsername(username);
+        User user = userService.searchByUsername(username);
         model.addAttribute("user", user);
         return new ModelAndView("userspace/avatar", "userModel", model);
     }
@@ -253,7 +253,7 @@ public class UserSpaceController {
         model.addAttribute("blogModel", blog);
         model.addAttribute("blogEditor", userService.searchById(blog.getUserId()));
         model.addAttribute("voteId", voteId);
-        log.info("8/9 总耗时：{},Blog：{}", System.currentTimeMillis() - timeSum, blog.getBlogId());
+        // log.info("8/9 总耗时：{},Blog：{}", System.currentTimeMillis() - timeSum, blog.getBlogId());
         return "userspace/blog";
     }
 

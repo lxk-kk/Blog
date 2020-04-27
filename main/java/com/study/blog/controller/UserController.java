@@ -23,7 +23,6 @@ import org.thymeleaf.expression.Strings;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.ConstraintViolationException;
-import javax.xml.ws.soap.Addressing;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -218,7 +217,7 @@ public class UserController {
     public String saveProfile(@PathVariable("username") String username, User user) {
         log.info("修改用户信息");
 
-        User originUser = service.findOneByUsername(username);
+        User originUser = service.searchByUsername(username);
         originUser.setEmail(user.getEmail());
         originUser.setName(user.getName());
         if (!PasswordValidation.equalPassword(originUser.getPassword(), user.getPassword())) {
@@ -239,7 +238,7 @@ public class UserController {
     @PreAuthorize("authentication.name.equals(#username)")
     @ValidateAnnotation
     public ModelAndView avatar(@PathVariable("username") String username, ModelAndView modelAndView) {
-        User originUser = service.findOneByUsername(username);
+        User originUser = service.searchByUsername(username);
         modelAndView.addObject("user", originUser);
         modelAndView.setViewName("/userspace/avatar");
         modelAndView.setViewName("userModel");
@@ -258,7 +257,7 @@ public class UserController {
     @ValidateAnnotation
     public ResponseEntity<ResultVO> avatar(@PathVariable("username") String username, @RequestBody User user) {
         String avatar = user.getAvatar();
-        User originUser = service.findOneByUsername(username);
+        User originUser = service.searchByUsername(username);
         originUser.setAvatar(avatar);
         service.updateUser(originUser);
         return ResponseEntity.ok().body(new ResultVO(true, "处理成功", avatar));

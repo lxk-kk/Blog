@@ -9,7 +9,6 @@ import com.study.blog.vo.CatalogVO;
 import com.study.blog.vo.ResultVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.bind.BindResult;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -17,7 +16,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
-import org.springframework.validation.BindException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -52,7 +50,7 @@ public class CatalogController {
     @GetMapping
     public String listCatalog(@RequestParam("username") String username, Model model) {
         // 根据用户名获取用户
-        User user = userService.findOneByUsername(username);
+        User user = userService.searchByUsername(username);
         assert user != null;
         log.info("blog user id={}", user.getId());
         List<Catalog> catalogList = catalogService.listCatalogs(user.getId());
@@ -88,14 +86,14 @@ public class CatalogController {
     @ValidateAnnotation(authorityId = 2)
     public ResponseEntity<ResultVO> create(@RequestBody @Validated CatalogVO catalogVO, BindingResult result) {
         if (result.hasErrors()) {
-            return ResponseEntity.ok().body(new ResultVO(false,result.getFieldError().getDefaultMessage()));
+            return ResponseEntity.ok().body(new ResultVO(false, result.getFieldError().getDefaultMessage()));
         }
         String username = catalogVO.getUsername();
         Catalog catalog = catalogVO.getCatalog();
         if (StringUtils.isEmpty(catalog.getName().trim())) {
             return ResponseEntity.ok().body(new ResultVO(false, "请填写分类！"));
         }
-        User user = userService.findOneByUsername(username);
+        User user = userService.searchByUsername(username);
         try {
             catalog.setUserId(user.getId());
             if (catalog.getId() != null) {
