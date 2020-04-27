@@ -24,15 +24,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
     private static final String KEY = "lxk";
-
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
+
 
     @Autowired
     public SecurityConfig(UserServiceImpl service, PasswordEncoder passwordEncoder) {
         this.userDetailsService = service;
         this.passwordEncoder = passwordEncoder;
     }
+
 
     /**
      * 自定义 AuthenticationProvider bean 对象：通过该bean对象 可从 UserDetailsService 中获取用户的登录信息
@@ -69,22 +70,14 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 // 登录时启用remember-me功能：这里需要一个key，可以随意设置一个字符串
                 .and().rememberMe().key(KEY)
                 // 处理异常，服务端拒绝访问时，将请求重定向到403页面
-                .and().exceptionHandling().accessDeniedPage("/403");
-        /*
-            由于默认情况下，系统是启用了csrf防护（跨站伪造防御）
-            对于有些资源不需要设定跨站防御，所以可以手动将这些资源排除在外，对指定的路径下的请求禁用csrf防护
-                http.csrf().ignoringAntMatchers(" ");
-         */
-        /*
-            允许来自同一来源的H2控制台请求？
-            http.headers().frameOptions().sameOrigin();
-         */
-
+                .and().exceptionHandling().accessDeniedPage("/403")
+                // 对 druid 禁用 csrf！
+                .and().csrf().ignoringAntMatchers("/druid/*");
     }
+
 
     /**
      * 重载 configure 方法：自定义认证信息管理：用户信息设置：用于登录认证
-     * <p>
      * 认证信息是存储于数据库的，所以需要使用UserDetailsService对象将认证信息从数据库中取出
      * UserDetailsService是一个接口，需要自定义一个实现类
      * 由于是与dao层交互，所以正好另 service 层的 UserServiceImpl 实现该接口，通过该service从数据库中获取用户认证信息
@@ -105,5 +98,4 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         corsConfiguration.addAllowedOrigin("*");
         return corsConfiguration;
     }*/
-
 }

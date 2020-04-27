@@ -10,8 +10,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * @author 10652
@@ -36,24 +34,15 @@ public class DruidConfig {
      */
     @Bean
     public ServletRegistrationBean<StatViewServlet> statViewServlet() {
-        /*
-            设置该servlet处理所有druid路径下的请求
-         */
-        ServletRegistrationBean<StatViewServlet> bean = new ServletRegistrationBean<>(
-                new StatViewServlet(),
-                "/druid/*"
-        );
-        /*
-            可初始化的的属性：在ResourceServlet可查看：StatViewServlet实现了该抽象类
-         */
-        Map<String, String> initParams = new HashMap<>(4);
-        initParams.put("loginUsername", "root");
-        initParams.put("loginPassword", "root");
-        //允许哪个ip可访问该后台：为空或者不写默认所有都可访问
-        initParams.put("allow", "");
-        //拒绝谁访问
-        //initParams.put("deny","192.168.43.57")
-        bean.setInitParameters(initParams);
+        // 设置该servlet处理所有druid路径下的请求
+        ServletRegistrationBean<StatViewServlet> bean = new ServletRegistrationBean<>(new StatViewServlet(),
+                "/druid/*");
+        //  可初始化的的属性：在ResourceServlet可查看：StatViewServlet实现了该抽象类
+        // 白名单
+        bean.addInitParameter("allow", "");
+        bean.addInitParameter("loginUsername", "admin");
+        bean.addInitParameter("loginPassword", "admin");
+        // bean.addInitParameter("resetEnable", "false");
         return bean;
     }
 
@@ -65,18 +54,12 @@ public class DruidConfig {
     public FilterRegistrationBean webStatFilter() {
         FilterRegistrationBean<WebStatFilter> bean = new FilterRegistrationBean<>();
         bean.setFilter(new WebStatFilter());
+        // 可初始化的属性在WebStatFilter类中查看
         //过滤所有请求
         bean.addUrlPatterns("/*");
-        /*
-            可初始化的属性在WebStatFilter类中查看
-         */
-        Map<String, String> initParams = new HashMap<>(2);
-        //设置不拦截这些请求：*.js,*.css,/druid/*
-        initParams.put("exclusions", "*.js,*.css,/druid/*");
-        bean.setInitParameters(initParams);
+        bean.addInitParameter("exclusions", "*.js,*.gif,*.jpg,*.png,*.css,*.ico");
+
         return bean;
     }
-    /*
-     * 接下来：启动应用：访问localhost:8080/druid/login即可查看后台监控
-     */
+    // 接下来：启动应用：访问localhost:8080/druid/login即可查看后台监控
 }
