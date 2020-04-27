@@ -49,7 +49,23 @@ public interface UserMapper {
      * @param id id
      * @return 用户
      */
-    User searchById(int id);
+    User searchById(@Param("id") int id);
+
+    /**
+     * 根据id查询用户(联表查询)
+     *
+     * @param id id
+     * @return 用户
+     */
+    User searchUserDetailById(@Param("id") int id);
+
+    /**
+     * 根据用户账号查询用户(联表查询)
+     *
+     * @param username 用户账号
+     * @return 用户
+     */
+    User searchUserDetailByUsername(@Param("username") String username);
 
     /**
      * 根据用户账号查询用户
@@ -57,7 +73,7 @@ public interface UserMapper {
      * @param username 用户账号
      * @return 用户
      */
-    User findOneByUsername(String username);
+    User findOneByUsername(@Param("username") String username);
 
     /**
      * 列出所有用户

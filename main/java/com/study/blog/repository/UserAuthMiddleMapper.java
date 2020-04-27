@@ -18,4 +18,12 @@ public interface UserAuthMiddleMapper {
      * @param authIds 权限id列表
      */
     void saveUserAuth(@Param("userId") Integer userId, @Param("authIds") List<Integer> authIds);
+
+    /**
+     * 从中间表 user_authority 中获取用户的 authority id 列表
+     *
+     * @param userId 用户 id
+     * @return id 列表
+     */
+    List<Integer> getAuthorityIdByUserId(@Param("userId") Integer userId);
 }

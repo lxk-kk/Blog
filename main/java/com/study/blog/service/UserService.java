@@ -62,7 +62,7 @@ public interface UserService {
      * @param username 用户账号
      * @return 用户
      */
-    User findOneByUsername(String username);
+    User searchByUsername(String username);
 
     /**
      * 更新用户头像

@@ -5,6 +5,7 @@ import com.study.blog.constant.CacheConstant;
 import com.study.blog.constant.ConcurrentConstant;
 import com.study.blog.constant.ValidateConstant;
 import com.study.blog.dto.BlogEvaluationCacheDTO;
+import com.study.blog.dto.BlogInfo;
 import com.study.blog.entity.Comment;
 import com.study.blog.entity.Vote;
 import com.study.blog.exception.LimitFlowException;
@@ -191,41 +192,107 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
     }
 
     /**
-     * 从数据库中刷新缓存
+     * 分表查询结果 合并
+     *
+     * @param blogId   blogId
+     * @param votes    votes
+     * @param comments comments
+     * @param blogInfo blogInfo
+     * @return blogEvaluation
+     */
+    private BlogEvaluationCacheDTO mergeEvaluation(Long blogId, List<Vote> votes, List<Comment> comments, BlogInfo
+            blogInfo) {
+        if (Objects.isNull(blogInfo)) {
+            return null;
+        }
+        BlogEvaluationCacheDTO blogEvaluationCacheDTO = new BlogEvaluationCacheDTO();
+        // read、vote、comment ：count
+        // BeanUtils.copyProperties(blogInfo, blogEvaluationCacheDTO);
+        blogEvaluationCacheDTO.setVoteCount(blogInfo.getVoteCount());
+        blogEvaluationCacheDTO.setCommentCount(blogInfo.getCommentCount());
+        blogEvaluationCacheDTO.setReadingCount(blogInfo.getReadingCount());
+        // voteList
+        if (Objects.isNull(votes) || votes.isEmpty()) {
+            blogEvaluationCacheDTO.setVotes(new ArrayList<>());
+            blogEvaluationCacheDTO.setVoteCount(0);
+        } else {
+            blogEvaluationCacheDTO.setVotes(votes);
+        }
+        // commentList
+        if (Objects.isNull(comments) || comments.isEmpty()) {
+            blogEvaluationCacheDTO.setComments(new ArrayList<>());
+            blogEvaluationCacheDTO.setCommentCount(0);
+        } else {
+            blogEvaluationCacheDTO.setComments(comments);
+        }
+        // blogId
+        blogEvaluationCacheDTO.setBlogId(blogId);
+        return blogEvaluationCacheDTO;
+    }
+
+    /**
+     * 从数据库中刷新缓存（分表查询数据库）
      *
      * @param blogId blogId
      * @return blogEvaluation
      */
-    private BlogEvaluationCacheDTO flushCacheByMySQL(Long blogId) {
-        // 从数据库纵获取数据
+    private BlogEvaluationCacheDTO flushCacheByMySQL2Split(Long blogId) {
+        BlogEvaluationCacheDTO blogEvaluation;
+        try {
+            blogEvaluation = mergeEvaluation(blogId
+                    , blogEvaluationRepository.findVoteListByBlogId(blogId)
+                    , blogEvaluationRepository.findCommentListByBlogId(blogId)
+                    , blogEvaluationRepository.findBlogInfoByBlogId(blogId)
+            );
+        } finally {
+            // 首先释放许可证：提高系统吞吐量！
+            // finally 保证许可证被释放！
+            limitFlowLock2Wait.releasePermission();
+        }
+        if (Objects.isNull(blogEvaluation)) {
+            redisTemplate.opsForValue().set(String.valueOf(blogId), CacheConstant.NULL, CacheConstant.EXPIRE,
+                    TimeUnit.SECONDS);
+            throw new NullBlogException("Blog：" + blogId + " " + ValidateConstant.NULL_BLOG_INFO);
+        }
+        // 刷新到缓存
+        saveBlogEvaluation2Redis(blogId, blogEvaluation);
+        return blogEvaluation;
+    }
+
+    /**
+     * 从数据库中刷新缓存(联表查询数据库)
+     *
+     * @param blogId blogId
+     * @return blogEvaluation
+     */
+    private BlogEvaluationCacheDTO flushCacheByMySQL2Join(Long blogId) {
         BlogEvaluationCacheDTO blogEvaluation;
         try {
             blogEvaluation = blogEvaluationRepository.findByBlogId(blogId);
         } finally {
             // 首先释放许可证：提高系统吞吐量！
-            // 保证许可证被释放！
-            // limitFlowLock2Park.releasePermission();
+            // finally 保证许可证被释放！
             limitFlowLock2Wait.releasePermission();
         }
         if (Objects.isNull(blogEvaluation)) {
-            // todo 防止 缓存穿透 处理
             redisTemplate.opsForValue().set(String.valueOf(blogId), CacheConstant.NULL, CacheConstant.EXPIRE,
                     TimeUnit.SECONDS);
             throw new NullBlogException("Blog：" + blogId + " " + ValidateConstant.NULL_BLOG_INFO);
         }
-        blogEvaluation.setBlogId(blogId);
-        log.info("blogEvaluation:{}", blogEvaluation);
-        // 从 mysql 中获取时使用的是 左连接 left join，所以 表之间关联时，comment以及vote表中可能没有数据，此时依旧会导出 null 值
-        if (Objects.isNull(blogEvaluation.getVoteCount()) || blogEvaluation.getVoteCount() == 0 ||
-                Objects.isNull(blogEvaluation.getVotes()) || blogEvaluation.getVotes().size() == 0) {
+        List<Vote> votes = blogEvaluation.getVotes();
+        List<Comment> comments = blogEvaluation.getComments();
+        // votes
+        if (Objects.isNull(votes) || votes.isEmpty()) {
+            blogEvaluation.setVotes(new ArrayList<>());
             blogEvaluation.setVoteCount(0);
-            blogEvaluation.setVotes(new ArrayList<>(1));
         }
-        if (Objects.isNull(blogEvaluation.getCommentCount()) || blogEvaluation.getCommentCount() == 0 ||
-                Objects.isNull(blogEvaluation.getComments()) || blogEvaluation.getComments().size() == 0) {
+        // commentList
+        if (Objects.isNull(comments) || comments.isEmpty()) {
+            blogEvaluation.setComments(new ArrayList<>());
             blogEvaluation.setCommentCount(0);
-            blogEvaluation.setComments(new ArrayList<>(1));
         }
+        // blogId
+        blogEvaluation.setBlogId(blogId);
         // 刷新到缓存
         saveBlogEvaluation2Redis(blogId, blogEvaluation);
         return blogEvaluation;
@@ -242,7 +309,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
         BlogEvaluationCacheDTO blogEvaluationCache;
         if (limitFlowLock2Wait.limitRequestPass(blogId, () -> Objects.isNull(judgeBlogNull(blogId)), false)) {
             try {
-                blogEvaluationCache = flushCacheByMySQL(blogId);
+                blogEvaluationCache = flushCacheByMySQL2Split(blogId);
             } finally {
                 // 保证锁被释放
                 // limitFlowLock2Park.releaseLock(blogId);

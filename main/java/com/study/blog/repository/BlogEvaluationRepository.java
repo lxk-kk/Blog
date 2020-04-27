@@ -1,6 +1,7 @@
 package com.study.blog.repository;
 
 import com.study.blog.dto.BlogEvaluationCacheDTO;
+import com.study.blog.dto.BlogInfo;
 import com.study.blog.entity.Comment;
 import com.study.blog.entity.Vote;
 import org.apache.ibatis.annotations.Param;
@@ -21,6 +22,30 @@ public interface BlogEvaluationRepository {
      * @return blog evaluation
      */
     BlogEvaluationCacheDTO findByBlogId(@Param("blogId") Long blogId);
+
+    /**
+     * 根据 blogId 获取 voteList
+     *
+     * @param blogId blogId
+     * @return voteList
+     */
+    List<Vote> findVoteListByBlogId(@Param("blogId") Long blogId);
+
+    /**
+     * 根据 blogId 获取 commentList
+     *
+     * @param blogId blogId
+     * @return commentList
+     */
+    List<Comment> findCommentListByBlogId(@Param("blogId") Long blogId);
+
+    /**
+     * 根据 blogId 获取 blog 的 阅读量、评论量、点赞量
+     *
+     * @param blogId blogId
+     * @return 评量信息
+     */
+    BlogInfo findBlogInfoByBlogId(@Param("blogId") Long blogId);
 
     /**
      * 批量保存 blog evaluation 信息
