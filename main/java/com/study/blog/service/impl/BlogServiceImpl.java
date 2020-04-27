@@ -2,7 +2,7 @@ package com.study.blog.service.impl;
 
 import com.github.pagehelper.Page;
 import com.study.blog.constant.CacheConstant;
-import com.study.blog.constant.ConcurrencyFlowConstant;
+import com.study.blog.constant.ConcurrentConstant;
 import com.study.blog.constant.ValidateConstant;
 import com.study.blog.dto.BlogEvaluationCacheDTO;
 import com.study.blog.entity.Blog;
@@ -10,7 +10,8 @@ import com.study.blog.entity.EsBlog;
 import com.study.blog.entity.User;
 import com.study.blog.exception.LimitFlowException;
 import com.study.blog.exception.NullBlogException;
-import com.study.blog.lock.LimitFlowLock;
+import com.study.blog.lock.LimitFlowLock2Park;
+import com.study.blog.lock.LimitFlowLock2Wait;
 import com.study.blog.repository.BlogRepository;
 import com.study.blog.repository.es2search.EsBlogRepository;
 import com.study.blog.service.BlogCacheService;
@@ -18,7 +19,6 @@ import com.study.blog.service.BlogEvaluationCacheService;
 import com.study.blog.service.BlogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Lookup;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -36,7 +36,8 @@ public class BlogServiceImpl implements BlogService {
     private final BlogEvaluationCacheService cacheService;
     private final RedisTemplate<String, Object> redisTemplate;
     private final BlogCacheService blogCacheService;
-    private LimitFlowLock limitFlowLock;
+    private final LimitFlowLock2Wait limitFlowLock2Wait;
+    private LimitFlowLock2Park limitFlowLock2Park;
 
     @Autowired
     public BlogServiceImpl(BlogRepository blogRepository,
@@ -49,14 +50,20 @@ public class BlogServiceImpl implements BlogService {
         this.cacheService = cacheService;
         this.redisTemplate = redisTemplate;
         this.blogCacheService = blogCacheService;
-        this.limitFlowLock = getLimitFlowLock();
+        this.limitFlowLock2Park = getLimitFlowLock2Park();
+        this.limitFlowLock2Wait = getLimitFlowLock2Wait();
     }
 
-    @Lookup
-    private LimitFlowLock getLimitFlowLock() {
-        LimitFlowLock limitFlowLock = new LimitFlowLock();
-        log.info("【Lock_BLOG】:{}", limitFlowLock);
-        return limitFlowLock;
+    private LimitFlowLock2Wait getLimitFlowLock2Wait() {
+        LimitFlowLock2Wait limitFlowLock2Wait = new LimitFlowLock2Wait();
+        log.info("【Lock_EVALUATION】:{}", limitFlowLock2Wait);
+        return limitFlowLock2Wait;
+    }
+
+    private LimitFlowLock2Park getLimitFlowLock2Park() {
+        LimitFlowLock2Park limitFlowLock2Park = new LimitFlowLock2Park();
+        log.info("【Lock_BLOG】:{}", limitFlowLock2Park);
+        return limitFlowLock2Park;
     }
 
     @Override
@@ -65,12 +72,14 @@ public class BlogServiceImpl implements BlogService {
         // 尝试从缓存中获取博客，如果是空数据，则会抛出异常！
         if (Objects.isNull(blog = judgeBlogNull(blogId))) {
             // 限流
-            if (limitFlowLock.limitRequestPass(blogId, () -> Objects.isNull(judgeBlogNull(blogId)), false)) {
+            if (limitFlowLock2Wait.limitRequestPass(blogId, () -> Objects.isNull(judgeBlogNull(blogId)), false)) {
                 try {
                     blog = flushCacheByMySQL(blogId);
                 } finally {
                     // 保证获取许可证的线程 释放许可证！
-                    limitFlowLock.releasePermission(blogId);
+                    // 保证许可证被释放！
+                    // limitFlowLock2Park.releaseLock(blogId);
+                    limitFlowLock2Wait.releaseLock(blogId);
                 }
             } else {
                 // 这部分线程是被限流被唤醒的!
@@ -78,7 +87,7 @@ public class BlogServiceImpl implements BlogService {
                 blog = judgeBlogNull(blogId);
                 if (Objects.isNull(blog)) {
                     // 如果被阻塞后还是为 null，说明现在请求资源的线程数太多了，返回系统正忙！
-                    throw new LimitFlowException("Blog:" + blogId + " " + ConcurrencyFlowConstant.SYSTEM_BUSY_MSG);
+                    throw new LimitFlowException("Blog:" + blogId + " " + ConcurrentConstant.SYSTEM_BUSY_MSG);
                 }
             }
         }
@@ -112,7 +121,15 @@ public class BlogServiceImpl implements BlogService {
      */
     private Blog flushCacheByMySQL(Long blogId) {
         // 从 数据库中获取
-        Blog blog = blogRepository.getBlogById(blogId);
+        Blog blog;
+        try {
+            blog = blogRepository.getBlogById(blogId);
+        } finally {
+            // 首先释放许可证：提高系统吞吐量！
+            // 保证许可证被释放！
+            // limitFlowLock2Park.releasePermission();
+            limitFlowLock2Wait.releasePermission();
+        }
         if (Objects.isNull(blog)) {
             // 说明数据库中也不存在，防止 缓存穿透 处理
             log.error("【获取 博客】blogId 为 {} 的 blog 不存在！", blogId);

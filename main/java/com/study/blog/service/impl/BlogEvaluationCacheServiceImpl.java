@@ -2,20 +2,20 @@ package com.study.blog.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.study.blog.constant.CacheConstant;
-import com.study.blog.constant.ConcurrencyFlowConstant;
+import com.study.blog.constant.ConcurrentConstant;
 import com.study.blog.constant.ValidateConstant;
 import com.study.blog.dto.BlogEvaluationCacheDTO;
 import com.study.blog.entity.Comment;
 import com.study.blog.entity.Vote;
 import com.study.blog.exception.LimitFlowException;
 import com.study.blog.exception.NullBlogException;
-import com.study.blog.lock.LimitFlowLock;
+import com.study.blog.lock.LimitFlowLock2Park;
+import com.study.blog.lock.LimitFlowLock2Wait;
 import com.study.blog.repository.BlogEvaluationRepository;
 import com.study.blog.service.BlogEvaluationCacheService;
 import com.study.blog.util.BlogCacheUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Lookup;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -36,7 +36,8 @@ import java.util.stream.Collectors;
 public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final BlogEvaluationRepository blogEvaluationRepository;
-    private final LimitFlowLock limitFlowLock;
+    private final LimitFlowLock2Park limitFlowLock2Park;
+    private final LimitFlowLock2Wait limitFlowLock2Wait;
 
 
     @Autowired
@@ -44,14 +45,20 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
                                           BlogEvaluationRepository blogEvaluationRepository) {
         this.redisTemplate = redisTemplate;
         this.blogEvaluationRepository = blogEvaluationRepository;
-        this.limitFlowLock = getLimitFlowLock();
+        this.limitFlowLock2Park = getLimitFlowLock2Park();
+        this.limitFlowLock2Wait = getLimitFlowLock2Wait();
     }
 
-    @Lookup
-    private LimitFlowLock getLimitFlowLock() {
-        LimitFlowLock limitFlowLock = new LimitFlowLock();
-        log.info("【Lock_EVALUATION】:{}", limitFlowLock);
-        return limitFlowLock;
+    private LimitFlowLock2Wait getLimitFlowLock2Wait() {
+        LimitFlowLock2Wait limitFlowLock2Wait = new LimitFlowLock2Wait();
+        log.info("【Lock_EVALUATION】:{}", limitFlowLock2Wait);
+        return limitFlowLock2Wait;
+    }
+
+    private LimitFlowLock2Park getLimitFlowLock2Park() {
+        LimitFlowLock2Park limitFlowLock2Park = new LimitFlowLock2Park();
+        log.info("【Lock_EVALUATION】:{}", limitFlowLock2Park);
+        return limitFlowLock2Park;
     }
 
     /**
@@ -191,7 +198,15 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
      */
     private BlogEvaluationCacheDTO flushCacheByMySQL(Long blogId) {
         // 从数据库纵获取数据
-        BlogEvaluationCacheDTO blogEvaluation = blogEvaluationRepository.findByBlogId(blogId);
+        BlogEvaluationCacheDTO blogEvaluation;
+        try {
+            blogEvaluation = blogEvaluationRepository.findByBlogId(blogId);
+        } finally {
+            // 首先释放许可证：提高系统吞吐量！
+            // 保证许可证被释放！
+            // limitFlowLock2Park.releasePermission();
+            limitFlowLock2Wait.releasePermission();
+        }
         if (Objects.isNull(blogEvaluation)) {
             // todo 防止 缓存穿透 处理
             redisTemplate.opsForValue().set(String.valueOf(blogId), CacheConstant.NULL, CacheConstant.EXPIRE,
@@ -199,6 +214,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
             throw new NullBlogException("Blog：" + blogId + " " + ValidateConstant.NULL_BLOG_INFO);
         }
         blogEvaluation.setBlogId(blogId);
+        log.info("blogEvaluation:{}", blogEvaluation);
         // 从 mysql 中获取时使用的是 左连接 left join，所以 表之间关联时，comment以及vote表中可能没有数据，此时依旧会导出 null 值
         if (Objects.isNull(blogEvaluation.getVoteCount()) || blogEvaluation.getVoteCount() == 0 ||
                 Objects.isNull(blogEvaluation.getVotes()) || blogEvaluation.getVotes().size() == 0) {
@@ -224,18 +240,19 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
     @Override
     public BlogEvaluationCacheDTO getBlogEvaluationFromMysql(Long blogId) {
         BlogEvaluationCacheDTO blogEvaluationCache;
-        if (limitFlowLock.limitRequestPass(blogId, () -> Objects.isNull(judgeBlogNull(blogId)), false)) {
+        if (limitFlowLock2Wait.limitRequestPass(blogId, () -> Objects.isNull(judgeBlogNull(blogId)), false)) {
             try {
                 blogEvaluationCache = flushCacheByMySQL(blogId);
             } finally {
                 // 保证锁被释放
-                limitFlowLock.releasePermission(blogId);
+                // limitFlowLock2Park.releaseLock(blogId);
+                limitFlowLock2Wait.releaseLock(blogId);
             }
         } else {
             // 这部分线程 是被阻塞后，被唤醒的
             blogEvaluationCache = judgeBlogNull(blogId);
             if (Objects.isNull(blogEvaluationCache)) {
-                throw new LimitFlowException("Blog:" + blogId + " " + ConcurrencyFlowConstant.SYSTEM_BUSY_MSG);
+                throw new LimitFlowException("Blog:" + blogId + " " + ConcurrentConstant.SYSTEM_BUSY_MSG);
             }
         }
         return blogEvaluationCache;
@@ -365,6 +382,7 @@ public class BlogEvaluationCacheServiceImpl implements BlogEvaluationCacheServic
         });
         blogEvaluation.getVotes().forEach(vote -> {
             String voteKey = BlogCacheUtil.generateKey(CacheConstant.VOTE, blogId);
+            log.info("【VOTE】voteKey:{},voteId:{}", voteKey, vote.getId());
             redisTemplate.opsForHash().put(voteKey, vote.getId(), vote);
         });
     }
