@@ -1,284 +1,137 @@
 package com.study.blog.lock;
 
 import com.study.blog.constant.ConcurrentConstant;
-import com.study.blog.exception.NullBlogException;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
 /**
+ * 【限流锁】
+ * 1. Semaphore 实现流量限制
+ * 2. 借助唯一的 blogId 作为锁标志，并以 blogId-blockedThreadList 作为 key-value 存储在 HashMap 中
+ * 3. 使用 LockSupport.park(timeout) - LockSupport.unpark(thread) 实现线程的阻塞和唤醒
+ * <p>
+ * 如果线程请求的 blogId，在 HashMap 中不存在，则它将持有锁，主要负责如下工作：
+ * （1）负责创建 blockedThreadList
+ * （2）负责访问数据库，刷新缓存
+ * （3）负责唤醒 blockedThreadList 中的线程（遍历 blockedThreadList 唤醒阻塞的线程）
+ * <p>
+ * 如果线程请求的 blogId，已经存在于 HashMap 中，则它将被阻塞，主要执行如下行为：
+ * （1）将自己的 thread 实例，加入 blockedThreadList 中
+ * （2）执行 LockSupport.park(timeout) 将自己阻塞
+ * （3）被唤醒（超时自动苏醒）之后，查询缓存，取走数据
+ *
  * @author 10652
- * 多例！
  */
 @Slf4j
-public class LimitFlowLock {
-    private HashMap<Long, ArrayList<Thread>> allowRequestSet;
-    private Semaphore allowRequest;
-    private int spinTime;
-
-
-    public LimitFlowLock() {
-        this.allowRequestSet = new HashMap<>(ConcurrentConstant.ALLOW_PERMISSION >> 1);
-        this.allowRequest = new Semaphore(ConcurrentConstant.ALLOW_PERMISSION);
-        spinTime = ConcurrentConstant.SPIN_TIME;
-    }
-
+public class LimitFlowLock2Park extends AbstractLimitFlowLock {
 
     /**
-     * 加锁 或者 阻塞：
-     * 通过 双重检测
-     *
-     * @param blogId       blogId
-     * @param makeSureLock 函数式接口：判断是否确认加锁
-     * @return true：允许通行（加锁），false：被阻塞，并且被唤醒
+     * 保存 blogId-blockedThreadList 键值对，以 blogId 作为锁标志，以 blockedThreadList 保存阻塞的线程
      */
-    private boolean allowOrWait(Long blogId, MakeSureLock makeSureLock, boolean spinningBlock) {
-        // 判断是否存在相同 博客 的请求
+    private final HashMap<Long, ArrayList<Thread>> allowRequestSet;
+
+
+    public LimitFlowLock2Park() {
+        super();
+        this.allowRequestSet = new HashMap<>(ConcurrentConstant.ALLOW_PERMISSION >> 1);
+    }
+
+    /**
+     * 尝试加锁通行
+     * <p>
+     * 双重检测锁：检测当前线程是否可通行
+     * （1）如果请求的 blogId 还未被记录，则记录当前 blogId 作为“锁标志”，并创建 blockedThreadList（给后续线程挖坑），返回 true
+     * （2）双重检测锁：保证相同请求的线程中，只有一个线程加锁，其他线程被阻塞！
+     * （3）缺点：锁对象为 allowRequestSet 会对所有线程起作用（不过，由于同步块内无耗时操作，相对耗时较少）
+     *
+     * @param blogId blogId
+     * @return true：加锁成功    false：加锁失败
+     */
+    @Override
+    boolean tryLock(Long blogId) {
         if (Objects.isNull(allowRequestSet.get(blogId))) {
-            synchronized (this) {
+            synchronized (allowRequestSet) {
                 if (Objects.isNull(allowRequestSet.get(blogId))) {
-                    // 当前线程 记录 博客请求，其他线程进来时，同一个 博客的 请求，就能获取该 threadList
                     allowRequestSet.put(blogId, new ArrayList<>());
-                } else {
-                    log.info("被 阻塞：thread:{}，BlogId:{}", Test.thisThread(), blogId);
-                    waitCache(blogId, makeSureLock, spinningBlock);
-                    // 提示：这是被阻塞后 被唤醒，或者是 超时自动唤醒的！
-                    return false;
+                    return true;
                 }
             }
-        } else {
-            log.info("被 阻塞：threadList:{}，BlogId:{}", Test.thisThread(), blogId);
-            // set 中已经记录了该 博客
-            waitCache(blogId, makeSureLock, spinningBlock);
-            // 提示：这是被阻塞后，被唤醒，或者是 超时自动唤醒的！
-            return false;
         }
-        return true;
-    }
-
-
-    /**
-     * 最终加锁判断：
-     * 1. 如果当前阻塞的线程数 达到 限制的数量：限流！
-     * 2. 如果当前缓存已更新，则不再需要获取许可证！
-     * 3. 尝试获取许可证：tryAcquire
-     *
-     * @param makeSureLock 确认是否加锁
-     * @return true：成功 获取 许可证，false：不获取许可证
-     * @throws InterruptedException 阻塞中断
-     */
-    private boolean dispatchPermission(MakeSureLock makeSureLock) throws InterruptedException {
-        return allowRequest.getQueueLength() <= ConcurrentConstant.LIMIT_FLOW
-                && makeSureLock.sureLock()
-                && allowRequest.tryAcquire(ConcurrentConstant.WAIT_TIMEOUT_M, TimeUnit.MINUTES);
-    }
-
-    /**
-     * 获取许可
-     *
-     * @param blogId       blogId
-     * @param makeSureLock 函数式接口：判断是否确认加锁
-     * @return true：加锁成功，false：线程被阻塞唤醒
-     */
-    public boolean limitRequestPass(Long blogId, MakeSureLock makeSureLock, boolean spinningBlock) {
-        // 测试耗时：起始时间
-        long time = Test.startTime();
-        if (!allowOrWait(blogId, makeSureLock, spinningBlock)) {
-            // 这是被唤醒的线程 / 超时自动唤醒的线程
-            // 测试耗时：耗时计算
-            Test.testWastTime(time, spinningBlock, Test.thisThread());
-            return false;
-        }
-        log.info("尝试获取 Permission：thread:{}，BlogID:{}", Test.thisThread(), blogId);
-        // 允许请求通行：说明这篇请求的 blog 还没有线程请求过！
-        // 由于要到数据库中获取，此时，应该被限流
-        try {
-            if (dispatchPermission(makeSureLock)) {
-                log.info("【可用 许可证】thread:{},permission：{}", Test.thisThread(), allowRequest.availablePermits());
-                return true;
-            }
-        } catch (InterruptedException e) {
-            log.error("【限流】：等待的线程（请求）被中断");
-            // todo 抛出异常
-        } catch (Exception e) {
-            // 针对函数式接口：sureLock，防止抛出异常：导致锁未被释放！
-            releasePermissionAndLock(blogId);
-            throw e;
-        }
-        log.info("【限流】释放误加的锁：{}", Test.thisThread());
-        // 释放误加的锁，并唤醒因此被阻塞的线程
-        releasePermissionAndLock(blogId);
         return false;
     }
 
     /**
-     * @param blogId blogId
-     * @return 被博客阻塞的线程数
-     */
-    public long getSize(Long blogId) {
-        ArrayList<Thread> list = allowRequestSet.get(blogId);
-        return list == null ? 0 : list.size();
-    }
-
-    /**
-     * 释放许可证：
-     * 将许可证的释放 与 锁的释放 分离，有助于提高系统吞吐量！
-     * 线程访问完数据库，就应该释放 许可证，避免因为刷新缓存的耗时，导致其他线程迟迟得不到许可证！
-     */
-    public void releasePermission() {
-        log.info("释放 permission ：thread:{}", Test.thisThread());
-        allowRequest.release();
-    }
-
-    /**
-     * 释放锁，以阻塞的方式，唤醒所有等待的线程
+     * 阻塞线程：线程加入 blockedThreadList，并将自己阻塞
+     * 1. 双重检测锁：将本线程的 thread 实例，加入 blockedThreadList
+     * --> 加锁：
+     * （1）保证：相同的请求，并发加入 blockedArrayList 的线程安全性！
+     * （2）保证：锁的释放(持有锁的线程，已将缓存刷新)与 当前线程加入blockedThreadList 能够串行化执行！
+     * --> 检测 blockedThreadList 是否为 null：
+     * （1）为 null：缓存已可用，直接返回，不用阻塞！
+     * （2）不为 null：缓存不可用，乖乖加入 blockedThreadList！
+     * --> 锁对象为 blockedThreadList，只会阻塞相同请求的 线程（同步块内，无耗时操作，相对耗时较少）
      * <p>
-     * 中断的方式唤醒线程：
-     * 考虑到，将线程加入 list 的操作和阻塞线程的操作并不能保证原子性（因为，线程被阻塞，就无法处理后事：例如：释放锁）
-     * ------------------------------------------------使用 wait/notifyAll ? -------------------------------------
-     * 因此，如果使用 unpark 的方式唤醒线程，那么，只能唤醒 list 中已经被阻塞的线程，而即将被阻塞的线程，无法处理！
-     * 而对于 运行 中的线程并不会响应中断，即使 list 中的线程还未被阻塞，那么设置了 中断标志位 之后，一旦阻塞就会中断！
-     * <p>
-     * 注意：blog锁的释放、线程的唤醒 必须在 synchronized 同步块中实现！
-     * 原因：synchronized 具有 原子性、可见性、有序性
-     * 1. 原子性：
-     * blog锁的释放意味着所有的被阻塞的线程都需要被唤醒，这是一个原子性语义！
-     * 2. 可见性：
-     * 释放锁 就是 从 set 中移除 list，如果不能保证 list 是最新数据，那么，最新添加到 list 中的线程将不会再被唤醒，只会超时苏醒！
-     * 3. 有序性：
-     * 如果唤醒线程的操作 被 重排到 释放锁的逻辑之前，那么，如果唤醒线程的操作 与 释放锁的操作 执行之间，正好有其他线程加入到这个 list，那将无法被唤醒！
+     * 2. 如果本线程加入了 blockedThreadList，则调用 LockSupport.parkNanos(timeout) 阻塞本线程
+     * 注意：LockSupport.parkNanos 方法阻塞的线程，不会释放所持有的锁资源，因此，不能在同步块中调用！！！
      *
      * @param blogId blogId
      */
-    public void releaseLock(Long blogId) {
+    @Override
+    void blockWaitCache(Long blogId) {
+        ArrayList<Thread> threadList;
+        if (!Objects.isNull(threadList = allowRequestSet.get(blogId))) {
+            synchronized (threadList) {
+                if (!Objects.isNull(threadList = allowRequestSet.get(blogId))) {
+                    // 加锁：就是为了保证 if 判断 与 threadList.add 操作的原子性
+                    // 防止持有锁的线程，在当前线程判断 if 之后，清除锁标记，并在当前线程未加入 threadList 之前，便唤醒 list 中的线程
+                    // 使得，当前线程加入 list，并自行阻塞之后，无人唤醒！
+                    threadList.add(Thread.currentThread());
+                } else {
+                    return;
+                }
+            }
+            LockSupport.parkNanos(Thread.currentThread(), ConcurrentConstant.WAIT_TIMEOUT_N);
+        }
+    }
+
+
+    /**
+     * 释放锁：清除锁标记，唤醒 blockedThreadList 中的所有线程
+     * <p>
+     * 注意：清除锁标记 allowRequestSet.remove(blogId) 必须加锁！
+     * 1. 锁对象为 blockedThreadList
+     * 2. 加锁的目的，是为了与 其他线程加入blockedThreadList 形成串行化操作！
+     * （1）避免，其他线程判断 锁是否存在之后，并在将自己的 thread 加入 blockedThreadList 之前，持有锁的线程清空锁标记，唤醒list 中的线程！
+     * <p>
+     * （2）如果发生这种情况，那么，即将执行 list.add 将自己加入 list 的线程，将无法被唤醒，只能超时自动苏醒！
+     * <p>
+     * （3）在不发生指令重排的情况下， releaseLoc方法 中的 allowRequestSet.remove(blogId) 执行之后才会执行 LockSupport.unpark(thread)
+     * 这能够保证，如果 set.remove 发生在 锁标志判空之前，那么线程阻塞将不会执行到 list.add，此时执行 unpark 是安全的！
+     * 如果 set.remove 发生在 list.add 之后，那么，此时执行 unpark 就能将 list 中的所有线程唤醒！如果新加入的当 新加入的线程执行到 park 时，将不会被阻塞！
+     * <p>
+     * （4）目前不确定会不会发生指令重排，不过经过测试，目前来说，remove 与 unpark 是有序的！
+     * 即：可以不将 unpark 操作放入 同步块 中！（略微提升吞吐量）
+     *
+     * @param blogId blogId
+     */
+    @Override
+    void unLock(Long blogId) {
         ArrayList<Thread> threadList = allowRequestSet.get(blogId);
         if (Objects.isNull(threadList)) {
-            log.error("【限流】：threadList 丢失");
+            log.error("【释放锁】：阻塞线程列表丢失！");
             // todo 抛出异常
             return;
         }
         synchronized (threadList) {
             allowRequestSet.remove(blogId);
-            for (Thread thread : threadList) {
-                thread.interrupt();
-            }
-            threadList.clear();
         }
-
-    }
-
-    /**
-     * 释放许可证 并 释放锁、唤醒线程
-     *
-     * @param blogId 博客 ID
-     */
-    private void releasePermissionAndLock(Long blogId) {
-        releasePermission();
-        releaseLock(blogId);
-    }
-
-    /**
-     * 阻塞线程：将线程加入队列，并阻塞线程
-     * 1. 阻塞线程前，根据使用者意愿，采取自旋的优化策略！(自旋次数可动态变化，达到性能优化的目的)
-     *
-     * @param blogId       blogId
-     * @param makeSureLock 函数式接口：判断是否确认加锁
-     */
-    private void waitCache(long blogId, MakeSureLock makeSureLock, boolean spinningBlock) {
-        if (spinningBlock) {
-            int spin = this.spinTime;
-            while (spin-- > 0) {
-                if (!makeSureLock.sureLock()) {
-                    log.info("【限流】阻塞之前，缓存已更新：自旋：{}", 4 - spin);
-                    return;
-                }
-            }
-            log.info("【限流】阻塞之前，无缓存：阻塞");
-        }
-        ArrayList<Thread> threadList = allowRequestSet.get(blogId);
-        if (Objects.isNull(threadList)) {
-            return;
-        }
-        boolean lockJudge = false;
-
-        // 加锁：使得 唤醒该list中的 thread 的行为，要么，在这之前完成，要么在这之后完成！
-        // 1. 如果在这之前完成，那么 set 中的 list 一定为 null
-        // 2. 在这之后完成，那么 当前线程就能够被其他线程成功唤醒！
-        synchronized (threadList) {
-            if (!Objects.isNull(threadList = allowRequestSet.get(blogId))) {
-                // 将当前线程 加入 List！
-                threadList.add(Thread.currentThread());
-                lockJudge = true;
-            }
-        }
-        if (!lockJudge) {
-            // 说明 set 中的 threadList == null：缓存以刷新，直接返回！
-            return;
-        }
-        try {
-            // 阻塞线程之前，先判断线程是否已经被中断！
-            if (Thread.interrupted()) {
-                return;
-            }
-            // todo 默认 阻塞 1 分钟：这个根据业务场景实际调整！
-            LockSupport.parkNanos(Thread.currentThread(), ConcurrentConstant.WAIT_TIMEOUT_N);
-        } finally {
-            // 清空中断标志位!
-            // 注意：LockSupport 阻塞的线程，会响应中断，但是不会抛出异常！
-            Thread.interrupted();
-            log.info("【限流】：等待的线程被唤醒：{}", Test.thisThread());
-        }
-    }
-
-    @FunctionalInterface
-    public interface MakeSureLock {
-        /**
-         * 最终确认是否加锁：防止因为网络延迟，导致 加锁线程 和 解锁线程之间的 相互错过 的情况！
-         *
-         * @return true：加锁 false：不加锁
-         * @throws NullBlogException 用于应对 空数据 异常
-         */
-        boolean sureLock() throws NullBlogException;
-    }
-
-    /**
-     * 测试
-     */
-    private static class Test {
-        private static AtomicInteger timeAve = new AtomicInteger(0);
-        private static AtomicInteger count = new AtomicInteger(0);
-
-        /**
-         * 测试耗时
-         *
-         * @return 起始时间
-         */
-        private static long startTime() {
-            return System.currentTimeMillis();
-        }
-
-        /**
-         * 测试耗时
-         *
-         * @param time time
-         */
-        private static void testWastTime(long time, boolean spin, long threadId) {
-            String msg = spin ? "自旋" : "阻塞";
-            System.out.println(msg + "：缓存已可用（" + threadId + "）WAST:" + (time = System.currentTimeMillis() - time));
-            System.out.println("平均耗时:" + timeAve.addAndGet((int) time) / count.addAndGet(1));
-        }
-
-        /**
-         * @return this threadId
-         */
-        private static long thisThread() {
-            return Thread.currentThread().getId();
+        // 暂且不将 for 循环加入上述同步块（for循环是耗时操作，同步块内能不耗时就不耗时）
+        for (Thread thread : threadList) {
+            LockSupport.unpark(thread);
         }
     }
 }
