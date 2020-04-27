@@ -25,12 +25,26 @@
     <select id="findByBlogId" resultMap="selectBlogEvaluation">
         SELECT
         b.read_count,b.comment_count,b.like_count,b.blog_id,
-        c.id,c.user_id,c.blog_id,c.content,
-        v.id,v.user_id,v.blog_id
+        c.id c_id,c.user_id c_user_id,c.blog_id c_blog_id,c.content c_content,
+        v.id v_id,v.user_id v_user_id,v.blog_id v_blog_id
         FROM blog b
         LEFT JOIN comment c ON b.blog_id=c.blog_id
         LEFT JOIN vote v ON b.blog_id=v.blog_id
         WHERE b.blog_id=#{blogId};
+    </select>
+    <select id="findVoteListByBlogId" resultType="com.study.blog.entity.Vote">
+        select id,user_id,blog_id from vote WHERE blog_id=#{blogId};
+    </select>
+    <select id="findCommentListByBlogId" resultType="com.study.blog.entity.Comment">
+        select id,user_id,blog_id,content from comment WHERE blog_id=#{blogId};
+    </select>
+    <select id="findBlogInfoByBlogId" resultType="com.study.blog.dto.BlogInfo">
+    /*
+        Integer commentCount;
+    Integer voteCount;
+    Integer readingCount;
+    */
+        select read_count as reading_count,comment_count,like_count as vote_count from blog WHERE blog_id=#{blogId};
     </select>
 
     <!--
@@ -158,21 +172,25 @@
             </trim>
         </trim>
     </update>
-    <!--注意 ： collection 和 association 中的 column 就写数据中字段的名称，不需要加表的别名！-->
+    <!--注意 ： collection 和 association 中的 column 就写数据中字段的名称，对于重名的字段，应该使用 别名！-->
     <resultMap id="selectBlogEvaluation" type="com.study.blog.dto.BlogEvaluationCacheDTO">
         <result property="readingCount" column="read_count"/>
         <result property="commentCount" column="comment_count"/>
         <result property="voteCount" column="like_count"/>
+        <!--
+         c.id,c.user_id,c.blog_id,c.content,
+        v.id,v.user_id,v.blog_id
+        -->
         <collection property="comments" ofType="com.study.blog.entity.Comment">
-            <id column="id" property="id"/>
-            <result column="user_id" property="userId"/>
-            <result column="blog_id" property="blogId"/>
-            <result column="content" property="content"/>
+            <id column="c_id" property="id"/>
+            <result column="c_user_id" property="userId"/>
+            <result column="c_blog_id" property="blogId"/>
+            <result column="c_content" property="content"/>
         </collection>
         <collection property="votes" ofType="com.study.blog.entity.Vote">
-            <id column="id" property="id"/>
-            <result column="user_id" property="userId"/>
-            <result column="blog_id" property="blogId"/>
+            <id column="v_id" property="id"/>
+            <result column="v_user_id" property="userId"/>
+            <result column="v_blog_id" property="blogId"/>
         </collection>
     </resultMap>
 </mapper>

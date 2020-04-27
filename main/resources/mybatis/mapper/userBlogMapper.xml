@@ -79,7 +79,7 @@
         SELECT
         b.blog_id,b.title,b.summary,b.content,b.html_content,b.read_count,b.comment_count,b.like_count,b.create_time,b.user_id,b.catalog_id,b.tags,
         /* c.id,c.user_id,c.content,c.create_time,c.blog_id, */
-        a.id,a.name,a.user_id
+        a.id a_id,a.name a_name,a.user_id a_user_id
         from blog b
        /* LEFT JOIN comment c ON b.blog_id=c.blog_id*/
         LEFT JOIN catalog a ON b.catalog_id=a.id
@@ -98,9 +98,9 @@
         <result column="like_count" property="likeCount"/>
         <result column="create_time" property="createTime"/>
         <association property="catalog" javaType="com.study.blog.entity.Catalog">
-            <id column="id" property="id"/>
-            <result column="name" property="name"/>
-            <result column="user_id" property="userId"/>
+            <id column="a_id" property="id"/>
+            <result column="a_name" property="name"/>
+            <result column="a_user_id" property="userId"/>
         </association>
     </resultMap>
 </mapper>

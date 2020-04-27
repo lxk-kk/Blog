@@ -9,4 +9,26 @@
         select authority_id ,authority_name  FROM authority where authority_id=#{id}
     </select>
 
+    <select id="getAuthorityList" resultType="com.study.blog.entity.Authority">
+        select authority_id,authority_name
+        FROM authority
+        WHERE authority_id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+
+    <!--
+    <sql id="selectUserWithoutPassword">
+        select
+        u.id,u.name,u.email,u.username,u.avatar,
+        a.authority_id,a.authority_name
+        from user u
+        LEFT OUTER JOIN user_authority ua ON ua.user_id=u.id
+        LEFT OUTER JOIN authority a ON a.authority_id=ua.authority_id
+        where uid=?
+    </sql>
+
+    -->
 </mapper>

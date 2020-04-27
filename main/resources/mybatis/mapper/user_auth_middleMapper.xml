@@ -11,4 +11,7 @@
             (#{userId},#{authId})
         </foreach>
     </insert>
+    <select id="getAuthorityIdByUserId" resultType="java.lang.Integer">
+        select authority_id from user_authority WHERE user_id=#{userId};
+    </select>
 </mapper>

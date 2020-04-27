@@ -62,14 +62,16 @@
         LEFT OUTER JOIN user_authority ua ON ua.user_id=u.id
         LEFT OUTER JOIN authority a ON a.authority_id=ua.authority_id
     </sql>
-    <select id="searchById" resultMap="selectDetailUser">
+    <select id="searchUserDetailById" resultMap="selectDetailUser">
         <include refid="selectUserWithPassword"/>
         where u.id=#{id};
     </select>
-    <select id="findOneByUsername" resultMap="selectDetailUser">
+
+    <select id="searchUserDetailByUsername" resultMap="selectDetailUser">
         <include refid="selectUserWithPassword"/>
         where u.username=#{username};
     </select>
+
     <select id="listUser" resultMap="selectUser">
         <include refid="selectUserWithoutPassword"/>
     </select>
@@ -88,5 +90,11 @@
         <foreach collection="list" item="user" separator="," open="(" close=")">
             #{user}
         </foreach>
+    </select>
+    <select id="searchById" resultType="com.study.blog.entity.User">
+        select u.id,u.name,u.email,u.username,u.password,u.avatar FROM  user u WHERE u.id=#{id};
+    </select>
+    <select id="findOneByUsername" resultType="com.study.blog.entity.User">
+        select u.id,u.name,u.email,u.username,u.password,u.avatar FROM  user u WHERE u.username=#{username};
     </select>
 </mapper>
