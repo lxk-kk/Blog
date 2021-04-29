@@ -66,7 +66,7 @@ public class LimitFlowLock2Wait extends AbstractLimitFlowLock {
      * <p>
      * 1. 双重检测锁：取出锁对象，执行 lockObject.wait(timeout) 阻塞当前线程
      * --> 加锁：
-     * （1） wait - notify 等待通知机制依赖于 对象监视器
+     * （1）wait - notify 等待通知机制依赖于 对象监视器
      * （2）必须保证锁标志的判断 与 线程的阻塞是一个原子性操作：防止判断锁标志之后，阻塞线程之前，锁标志被清除！
      * --> 检测 lockObject 是否为 null：
      * （1）为 null：缓存已可用，直接返回，不用阻塞！
@@ -85,7 +85,7 @@ public class LimitFlowLock2Wait extends AbstractLimitFlowLock {
                     try {
                         lockObject.wait(ConcurrentConstant.WAIT_TIMEOUT_MILLS);
                     } catch (InterruptedException e) {
-                        // todo 阻塞的线程被中断 --- 重置标志位？？要不要重置？
+                        // todo 阻塞的线程被中断 --- 重置中断标志？？要不要重置？
                         // Thread.interrupted();
                         log.info("【阻塞】等待缓存刷新的线程 {} 被中断", Thread.currentThread());
                     }
@@ -117,7 +117,7 @@ public class LimitFlowLock2Wait extends AbstractLimitFlowLock {
             return;
         }
         if (!Objects.equals(lockObject, Thread.currentThread())) {
-            log.error("【释放锁】：加锁 & 释放锁：不是同一个线程");
+            log.error("【释放锁】无权限：加锁 & 释放锁：不是同一个线程");
             return;
         }
         synchronized (lockObject) {

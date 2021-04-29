@@ -1,3 +1,4 @@
+# 192.168.0.122
 spring:
   thymeleaf:
     #设置thymeleaf的编码格式
@@ -9,12 +10,13 @@ spring:
   data:
     # ES 搜索引擎
     elasticsearch:
-      cluster-nodes: 127.0.0.1:9300
+      cluster-nodes: localhost:9300
       properties:
         transport:
           tcp:
-            connect_timeout: 120s
+            connect_timeout: 60s
     mongodb:
+      # 连接服务器上的 mongodb 服务器通过nginx将端口封闭(并没有实现)
       uri: mongodb://localhost:27017/blog
 
   datasource:
@@ -29,7 +31,7 @@ spring:
     type: com.alibaba.druid.pool.DruidDataSource
     initialSize: 5 #连接池启动时，初始化的连接数量
     minIdle: 5 #在不创建新的连接下，池中保持空闲的最小连接数
-    maxActive: 1000 #同一时间可以从池中分配的最多连接数量，0表示无限制
+    maxActive: 200 #同一时间可以从池中分配的最多连接数量，0表示无限制
     maxWait: 60000 #设置最大等待时间：ms
     timeBetweenEvictionRunsMills: 60000
     minEvictableIdleTimeMills: 300000
@@ -37,6 +39,9 @@ spring:
     testWhileIdle: true
     testOnBorrow: false
     testOnReturn: false
+    removeAbandoned: true
+    removeAbandonedTimeout: 20
+    logAbandoned: true
 
     #是否对预处理语句prepared statement进行池管理
     poolPreparedStatement: true
@@ -57,14 +62,14 @@ spring:
     port: 63790
     host: localhost
     timeout: 120s
-    # password: ***
+  # password: qwertyuiop09901221-==-
+  # 将过期时间设置为 0 方便我压力测试！
   session:
-    store-type: redis
+    timeout: 0
 mybatis:
   config-location: classpath:mybatis/mybatis-config.xml
   #配置了mapper-locations，则不用再mybatis-config配置文件配置相应的mapper标签
   mapper-locations: classpath:mybatis/mapper/*.xml
-
 
 # 文件服务器的接口地址：需要在8081端口上启动一个文件服务器：该服务器使用讲师写的mongodb-file-server组件
 # 该地址需要返回给前端，在需要地方 通过@Value注解就可以取得该文件服务器的地址：@Value("${file.server.url}")
@@ -72,13 +77,15 @@ mybatis:
 #  server:
 #    ip: localhost
 #    port: 27017
-
-
-# 暂不启用新的登录方式
-validate:
-  start: no
-
 pagehelper:
   reasonable: true
   params: pageNum=pageIndex;pageSize=pageSize
   support-methods-arguments: true
+# 暂不启用新的登录方式
+validate:
+  start: yes
+
+
+
+
+

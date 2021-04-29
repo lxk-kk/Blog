@@ -56,7 +56,8 @@ public class LimitFlowLock2Park extends AbstractLimitFlowLock {
         if (Objects.isNull(allowRequestSet.get(blogId))) {
             synchronized (allowRequestSet) {
                 if (Objects.isNull(allowRequestSet.get(blogId))) {
-                    allowRequestSet.put(blogId, new ArrayList<>());
+                    ArrayList<Thread> blockedThreadList = new ArrayList<>();
+                    allowRequestSet.put(blogId, blockedThreadList);
                     return true;
                 }
             }
@@ -82,14 +83,14 @@ public class LimitFlowLock2Park extends AbstractLimitFlowLock {
      */
     @Override
     void blockWaitCache(Long blogId) {
-        ArrayList<Thread> threadList;
-        if (!Objects.isNull(threadList = allowRequestSet.get(blogId))) {
-            synchronized (threadList) {
-                if (!Objects.isNull(threadList = allowRequestSet.get(blogId))) {
-                    // 加锁：就是为了保证 if 判断 与 threadList.add 操作的原子性
-                    // 防止持有锁的线程，在当前线程判断 if 之后，清除锁标记，并在当前线程未加入 threadList 之前，便唤醒 list 中的线程
+        ArrayList<Thread> blockedThreadList;
+        if (!Objects.isNull(blockedThreadList = allowRequestSet.get(blogId))) {
+            synchronized (blockedThreadList) {
+                if (!Objects.isNull(blockedThreadList = allowRequestSet.get(blogId))) {
+                    // 加锁：就是为了保证 if 判断 与 blockedThreadList.add 操作的原子性
+                    // 防止持有锁的线程，在当前线程判断 if 之后，清除锁标记，并在当前线程未加入 blockedThreadList 之前，便唤醒 list 中的线程
                     // 使得，当前线程加入 list，并自行阻塞之后，无人唤醒！
-                    threadList.add(Thread.currentThread());
+                    blockedThreadList.add(Thread.currentThread());
                 } else {
                     return;
                 }
@@ -111,26 +112,25 @@ public class LimitFlowLock2Park extends AbstractLimitFlowLock {
      * <p>
      * （3）在不发生指令重排的情况下， releaseLoc方法 中的 allowRequestSet.remove(blogId) 执行之后才会执行 LockSupport.unpark(thread)
      * 这能够保证，如果 set.remove 发生在 锁标志判空之前，那么线程阻塞将不会执行到 list.add，此时执行 unpark 是安全的！
-     * 如果 set.remove 发生在 list.add 之后，那么，此时执行 unpark 就能将 list 中的所有线程唤醒！如果新加入的当 新加入的线程执行到 park 时，将不会被阻塞！
      * <p>
-     * （4）目前不确定会不会发生指令重排，不过经过测试，目前来说，remove 与 unpark 是有序的！
+     * （4）这里不会发生指令重排，不过经过测试，目前来说，remove 与 unpark 是有序的！
      * 即：可以不将 unpark 操作放入 同步块 中！（略微提升吞吐量）
      *
      * @param blogId blogId
      */
     @Override
     void unLock(Long blogId) {
-        ArrayList<Thread> threadList = allowRequestSet.get(blogId);
-        if (Objects.isNull(threadList)) {
+        ArrayList<Thread> blockedThreadList = allowRequestSet.get(blogId);
+        if (Objects.isNull(blockedThreadList)) {
             log.error("【释放锁】：阻塞线程列表丢失！");
             // todo 抛出异常
             return;
         }
-        synchronized (threadList) {
+        synchronized (blockedThreadList) {
             allowRequestSet.remove(blogId);
         }
         // 暂且不将 for 循环加入上述同步块（for循环是耗时操作，同步块内能不耗时就不耗时）
-        for (Thread thread : threadList) {
+        for (Thread thread : blockedThreadList) {
             LockSupport.unpark(thread);
         }
     }

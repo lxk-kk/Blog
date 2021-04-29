@@ -1,6 +1,7 @@
 package com.study.blog.entity;
 
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
@@ -19,6 +20,7 @@ import java.util.Date;
 @Document(indexName = "blog", type = "blog")
 @XmlRootElement
 @Data
+@Slf4j
 public class EsBlog implements Serializable {
     private static final long serialVersionUID = 196033427711217910L;
 
@@ -119,6 +121,7 @@ public class EsBlog implements Serializable {
         BeanUtils.copyProperties(blog, this);
         this.avatar = user.getAvatar();
         this.username = user.getUsername();
+        // log.info("ES_BLOG_LIST:{}", avatar);
     }
 
     public void update(Blog blog, User user) {

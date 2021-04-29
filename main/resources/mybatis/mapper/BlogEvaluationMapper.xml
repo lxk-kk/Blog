@@ -39,11 +39,6 @@
         select id,user_id,blog_id,content from comment WHERE blog_id=#{blogId};
     </select>
     <select id="findBlogInfoByBlogId" resultType="com.study.blog.dto.BlogInfo">
-    /*
-        Integer commentCount;
-    Integer voteCount;
-    Integer readingCount;
-    */
         select read_count as reading_count,comment_count,like_count as vote_count from blog WHERE blog_id=#{blogId};
     </select>
 
@@ -60,6 +55,11 @@
         如： c.content=#{comment.content,jdbcType=VARCHAR} 最后没有加上逗号
         报错：expect IDENTIFIER, actual IDENTIFIER ... token IDENTIFIER v v.id=?  v.user_id=?
      -->
+
+    <!--
+        1. 表连接 left join 将会使得没有数据的表导出 所有字段为 null 的实体！
+        2. case when 一定要把 when 的条件列全，列不全则给出 else 否则会提示字段不能为 null
+    -->
     <update id="saveBlogEvaluationByBlogId" parameterType="com.study.blog.dto.BlogEvaluationCacheDTO">
         <foreach collection="evaluationList" item="blog" separator="" close="" open="">
             UPDATE

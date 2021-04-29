@@ -4,6 +4,8 @@ import com.github.pagehelper.Page;
 import com.study.blog.entity.Blog;
 import com.study.blog.entity.User;
 
+import java.util.List;
+
 /**
  * @author 10652
  */
@@ -79,4 +81,9 @@ public interface BlogService {
      * @return 博客列表
      */
     Page<Blog> listBlogsByTitleLikeAndDescSort(int userId, String title, int startPage, int pageSize);
+
+    /**
+     * @return 博客列表
+     */
+    List<Blog> listAllBlog();
 }

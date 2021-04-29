@@ -43,10 +43,21 @@
         </li>
     </ul>
 
+    <!--
+    lt：less than 小于
+    le：less than or equal to 小于等于
+    eq：equal to 等于
+    ne：not equal to 不等于
+    ge：greater than or equal to 大于等于
+    gt：greater than 大于
+    -->
     <!-- 处理页数大于7 的情况 -->
     <ul class="pagination" data-th-if="${page.totalPages gt 7}">
         <!-- 总记录数 -->
-        <li class="tbpage-total-elements disabled">共[[${page.totalElements}]]条</li>
+        <li th:if="${page.totalElements lt 10000}" class="tbpage-total-elements disabled">
+            共 [[${page.totalElements}]] 条
+        </li>
+        <li th:if="${page.totalElements ge 10000}" class="tbpage-total-elements disabled">共 10000 条</li>
 
         <!-- 页面大小 -->
         <select class="custom-select tbpage-size" data-th-attr="pageIndex=${page.number}">
@@ -126,7 +137,8 @@
 
         <!-- 最后一页 -->
         <li class="page-item" data-th-classappend="${(page.number + 1) eq page.totalPages} ? 'active' : ''">
-            <a href="javascript:void(0);" class="page-link tbpage-item" data-th-attr="pageIndex=${page.totalPages} - 1">[[${page.totalPages}]]</a>
+            <a th:if="${page.totalPages le 1000}" href="javascript:void(0);" class="page-link tbpage-item" data-th-attr="pageIndex=${page.totalPages} - 1">[[${page.totalPages}]]</a>
+            <a th:if="${page.totalPages gt 1000}" href="javascript:void(0);" class="page-link tbpage-item" data-th-attr="pageIndex=999">999</a>
         </li>
 
         <!-- 下一页 -->

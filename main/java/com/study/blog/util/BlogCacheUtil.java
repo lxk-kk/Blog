@@ -14,7 +14,7 @@ public class BlogCacheUtil {
             // todo id为null 抛出异常
             log.error("【 生成 key 】 id 为 null ！");
         }
-        return String.valueOf(id1) + "::" + id2;
+        return String.valueOf(id1) + ":" + id2;
     }
 
     public static String generateKey(String key, Long id2) {
@@ -22,7 +22,7 @@ public class BlogCacheUtil {
             // todo id为null 抛出异常
             log.error("【 生成 key 】 id 为 null ！");
         }
-        return String.valueOf(key) + "::" + id2;
+        return String.valueOf(key) + ":" + id2;
     }
 
     public static String generateKey(String key, Integer id2) {

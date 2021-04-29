@@ -12,8 +12,8 @@
     <!--default header name is X-CSRF-TOKEN -->
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <meta name="userName" th:content="${#authentication.name}"/>
-    <meta name="file_server" content="http://ip地址/file/"/>
-    <!--<meta name="file_server" content="http://localhost:9090/file/"/>-->
+    <!--<meta name="file_server" content="http://192.168.0.122/file/"/>-->
+    <meta name="file_server" content="http://localhost:9090/file/"/>
 
     <!-- Tether core CSS -->
     <link href="../../static/css/tether.min.css" th:href="@{/css/tether.min.css}" rel="stylesheet">

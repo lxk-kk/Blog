@@ -19,7 +19,14 @@
     <select id="getVoteUser" resultType="java.lang.Integer">
         SELECT user_id FROM vote WHERE id=#{voteId};
     </select>
-    <select id="listVoteByBlogId" resultType="com.study.blog.entity.Vote">
-        SELECT id,user_id,blog_id FROM blog WHERE blog_id=#{blogId};
+    <select id="listVoteByBlogId" resultMap="BaseResult">
+        SELECT id,user_id,blog_id FROM vote WHERE blog_id=#{blogId};
     </select>
+
+    <resultMap id="BaseResult" type="com.study.blog.entity.Vote">
+        <id column="id" jdbcType="BIGINT" property="id"/>
+        <result column="user_id" jdbcType="INTEGER" property="userId"/>
+        <result column="blog_id" jdbcType="BIGINT" property="blogId"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+    </resultMap>
 </mapper>

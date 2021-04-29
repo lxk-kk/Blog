@@ -6,6 +6,7 @@
 
 // DOM 加载完再执行
 $(function () {
+    var fileServer = $("meta[name='file_server']").attr("content");
 
     // 初始化 md 编辑器
     $("#md").markdown({
@@ -15,8 +16,8 @@ $(function () {
         },
         resize: 'vertical',
         localStorage: 'md',
-        imgurl: 'http://localhost:9090/file',
-        base64url: 'http://localhost:9090/file'
+        imgurl: fileServer,
+        base64url: fileServer
     });
 
     // 初始化下拉
@@ -46,13 +47,12 @@ $(function () {
         console.info($('#uploadformid')[0]);
         var dataIma = new FormData($('#uploadformid')[0]);
         console.info(dataIma);
-        if(dataIma === null) {
+        if (dataIma === null) {
             alert("请正确上传图片");
             return;
         }
         $.ajax({
-            url: fileServer+'upload',
-            //http://localhost:9090/file/upload
+            url: fileServer + 'upload',
             type: 'POST',
             cache: false,
             data: dataIma,
@@ -85,7 +85,7 @@ $(function () {
                 "summary": $('#summary').val(),
                 "content": $('#md').val(),
                 "userId": $('#userId').val(),
-                "catalog":{"id":$('#catalogSelect').val()},
+                "catalog": {"id": $('#catalogSelect').val()},
                 "tags": $('.form-control-tag').val()
             }),
             beforeSend: function (request) {

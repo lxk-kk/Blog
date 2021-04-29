@@ -215,10 +215,8 @@ public class UserSpaceController {
     @ValidateAnnotation(authorityId = 2)
     public String getBlogById(@PathVariable("username") String username, @PathVariable("id") Long id, Model
             model) {
-        long timeSum = System.currentTimeMillis();
         // 每次查询阅读量增加一次：较为简易
         blogService.readingIncrement(id);
-        // cacheService.incrementBlogReading(id)
 
         User principal = null;
         boolean isBlogOwner = false;

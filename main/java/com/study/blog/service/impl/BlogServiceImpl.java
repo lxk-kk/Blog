@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -64,6 +65,18 @@ public class BlogServiceImpl implements BlogService {
         LimitFlowLock2Park limitFlowLock2Park = new LimitFlowLock2Park();
         log.info("【Lock_BLOG】:{}", limitFlowLock2Park);
         return limitFlowLock2Park;
+    }
+
+    // @Override
+    public Blog getBlogById_1(Long blogId) {
+        Blog blog = blogRepository.getBlogById(blogId);
+        log.info("blogId:{}", blogId);
+        if (Objects.isNull(blog)) {
+            throw new NullBlogException(ValidateConstant.NULL_BLOG_INFO);
+        }
+        // 使用 缓存中的指标量展示博客
+        blogCacheEvaluation(blog);
+        return blog;
     }
 
     @Override
@@ -284,6 +297,11 @@ public class BlogServiceImpl implements BlogService {
         }
         log.info("title:{}", title);
         return blogRepository.findByTitleLikeAndOrderByTimeDesc(userId, title, startPage, pageSize);
+    }
+
+    @Override
+    public List<Blog> listAllBlog() {
+        return blogRepository.listAllBlog();
     }
 
     /**

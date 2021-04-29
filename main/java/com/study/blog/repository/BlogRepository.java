@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Date;
+import java.util.List;
 
 
 /**
@@ -53,6 +54,7 @@ public interface BlogRepository {
 
     /**
      * 获取 博客创建事件
+     *
      * @param id blog id
      * @return createTime
      */
@@ -92,4 +94,11 @@ public interface BlogRepository {
      */
     Page<Blog> findByCatalog(@Param("catalogId") Long catalogId, @Param("pageIndex") int pageIndex, @Param
             ("pageSize") int pageSize);
+
+    /**
+     * 获取所有博客：应用启动时，刷新到 ES 中
+     *
+     * @return 博客列表
+     */
+    List<Blog> listAllBlog();
 }

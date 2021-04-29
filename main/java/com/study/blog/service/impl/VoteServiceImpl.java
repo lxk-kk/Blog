@@ -3,6 +3,7 @@ package com.study.blog.service.impl;
 import com.study.blog.entity.EsBlog;
 import com.study.blog.entity.User;
 import com.study.blog.entity.Vote;
+import com.study.blog.repository.VoteRepository;
 import com.study.blog.repository.es2search.EsBlogRepository;
 import com.study.blog.service.BlogEvaluationCacheService;
 import com.study.blog.service.VoteService;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -22,6 +24,9 @@ public class VoteServiceImpl implements VoteService {
 
     private final EsBlogRepository esBlogRepository;
     private final BlogEvaluationCacheService cacheService;
+
+    @Autowired
+    VoteRepository voteRepository;
 
     @Autowired
     public VoteServiceImpl(EsBlogRepository esBlogRepository, BlogEvaluationCacheService cacheService) {
@@ -55,22 +60,20 @@ public class VoteServiceImpl implements VoteService {
     @Override
     public Long isVoted(Long blogId, Integer userId) {
         // 从缓存中查询 todo
-        /*List<Vote> votes = cacheService.judgeVotedById(blogId,userId);
+        /*List<Vote> votes = voteRepository.listVoteByBlogId(blogId);
         log.info("【list<Vote> 】:{}", votes);
         for (Vote vote : votes) {
             if (Objects.equals(vote.getUserId(), userId)) {
                 return vote.getId();
             }
         }*/
-        /*
-        Integer isVoted = repository.isVoted(new Vote(blogId, userId))
-        return Objects.isNull(isVoted) ? 0 : isVoted;
-        */
-        Long time = System.currentTimeMillis();
+        Integer isVote = voteRepository.isVoted(new Vote(blogId, userId));
+        return Objects.isNull(isVote) ? 0L : isVote;
+        /*Long time = System.currentTimeMillis();
         Long longv = cacheService.judgeVotedById(blogId, userId);
         System.out.println("点赞判断：1：" + (System.currentTimeMillis() - time));
         // log.info("longv:{}", longv)
-        return longv;
+        return longv;*/
     }
 
     @Override

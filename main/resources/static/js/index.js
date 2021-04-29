@@ -13,8 +13,8 @@ $(function() {
 	var _pageSize; // 存储用于搜索
 	// 根据用户名、页面索引、页面大小获取用户列表
 	function getBlogsByName(pageIndex, pageSize) {
-        if($("#indexkeyword").val().trim().length === 0){
-            alert("请正确搜索！");
+        if(pageIndex > 999){
+            alert("到底啦~");
             return;
         }
 		 $.ajax({ 

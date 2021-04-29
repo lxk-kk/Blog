@@ -65,8 +65,13 @@
         <include refid="selectBlog"/>
         where b.blog_id=#{id}
     </select>
+
     <select id="getCreateTime" resultType="java.util.Date">
         SELECT create_time from blog where blog_id=#{id};
+    </select>
+    <!--查询所有博客：List<Blog>-->
+    <select id="listAllBlog" resultMap="returnBlog">
+        <include refid="selectBlog"/>
     </select>
 
     <!--

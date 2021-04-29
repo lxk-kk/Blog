@@ -140,6 +140,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     public User searchByUsername(String username) {
+        log.info("search user :{}", username);
         return searchUserDetailByUsername(username);
     }
 

@@ -71,7 +71,7 @@ public abstract class AbstractLimitFlowLock {
             } catch (InterruptedException e) {
                 log.error("【获取许可证】等待获取被中断");
             } catch (Exception sureLockException) {
-                log.info("【获取许可证】获取前异常");
+                log.info("【获取许可证】获取前 SureLock 异常");
                 releaseLock(blogId);
                 throw sureLockException;
             }
@@ -106,7 +106,7 @@ public abstract class AbstractLimitFlowLock {
      * 2. sureLock：如果当前缓存已更新，则不再需要获取许可证（返回 false）！
      * 3. tryAcquire(timeout)：尝试获取许可证：tryAcquire
      * （1）成功获取：返回 true
-     * （2） 超时未获取：返回 false
+     * （2）超时未获取：返回 false
      *
      * @param makeSureLock 确认是否加锁
      * @return true：成功 获取 许可证，false：不获取许可证
@@ -122,7 +122,7 @@ public abstract class AbstractLimitFlowLock {
      * 加锁通行 Or 被阻塞
      * <p>
      * 1. tryLock 尝试加锁
-     * （1） true：加锁成功：返回 true
+     * （1）true：加锁成功：返回 true
      * （2）false：加锁失败：被阻塞，苏醒后返回 false
      * 2. waitCache 阻塞线程
      * 当线程从 waitCache 返回时，说明线程被唤醒/线程超时自动唤醒/阻塞前缓存已可用，返回 false

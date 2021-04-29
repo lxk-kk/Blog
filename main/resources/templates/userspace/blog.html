@@ -87,8 +87,8 @@
                     </div>
                     <!--评论与点赞按钮-->
                     <button class="btn btn-primary float-right" id="submitComment">发表评论</button>
-                    <button class="btn btn-primary float-right" th:if="${voteId} eq 0" id="submitVote">点赞</button>
-                    <button class="btn btn-primary float-right" th:if="${voteId} > 0" id="cancelVote"
+                    <button class="btn btn-primary float-right" th:if="${voteId} == null or ${voteId} eq 0" id="submitVote">点赞</button>
+                    <button class="btn btn-primary float-right" th:if="${voteId} != null and ${voteId} > 0" id="cancelVote"
                             th:attr="voteId=${voteId}">
                         取消点赞
                     </button>

@@ -14,28 +14,29 @@
         <div class="col-md-8">
             <div id="mainContainer">
                 <div id="mainContainerRepleace">
-                    <div class="card mb-4" th:each="blog : ${blogList}">
+                    <div class="card mb-4" th:each="blog : ${blogList}" th:object="${blog}">
                         <div class="card-block">
                             <h2 class="card-title">
                                 <span>
-                                    <a href="/u/lxk" title="lxk" th:href="'/u/'+${blog.username}"
-                                       th:title="${blog.username}">
+                                    <a href="/u/lxk" title="lxk" th:href="'/u/'+ *{username}" th:title="*{username}">
                                         <img class="blog-avatar-50" src="/images/avatar-default.jpg"
-                                             th:src="${blog.avatar} == null ? '/images/avatar-default.jpg' : ${blog.avatar}">
+                                             th:src="*{avatar} == null ? '/images/avatar-default.jpg' : *{avatar}">
                                     </a>
+
                                 </span>
                                 <a class="card-link" href="/u/lxk/blogs/1" title="lxk"
-                                   th:href="'/u/' + ${blog.username} + '/blogs/' + ${blog.blogId} "
-                                   th:title="${blog.title}" th:text="${blog.title}">
+                                   th:href="'/u/' + *{username} + '/blogs/' + *{blogId} "
+                                   th:title="*{title}" th:text="*{title}">
                                     blog content
                                 </a>
                             </h2>
-                            <p class="card-text" th:text="${blog.summary}">
+                            <p class="card-text" th:text="*{summary}">
                                 总结
                             </p>
                             <div class="card-text">
-                                <a class="card-link" href="/u/lxk" th:href=" '/u/' + ${blog.username} "
-                                   th:text="${blog.username}"> 作者
+                                <a class="card-link" href="/u/lxk" th:href=" '/u/' + *{username} "
+                                   th:text="*{username}">
+                                    作者
                                 </a>
                                 <!--发表时间-->
                                 发表于 [[${#dates.format(blog.createTime, 'yyyy-MM-dd HH:mm')}]]

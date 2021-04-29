@@ -100,7 +100,7 @@
                 <span aria-hidden="true">...</span>
             </a>
         </li>
-        <li class="page-item" data-th-if="${( page.pageNum gt 4) && ( page.pages - page.pageNum ) gt 3 )}">
+        <li class="page-item" data-th-if="${( page.pageNum gt 4) && (( page.pages - page.pageNum ) gt 3 )}">
             <a href="javascript:void(0);" class="page-link tbpage-item" data-th-attr="pageIndex=${ page.pageNum }">[[${
                 page.pageNum }]]</a>
         </li>
